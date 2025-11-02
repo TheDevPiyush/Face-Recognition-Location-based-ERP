@@ -1,0 +1,54 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+  --primary: #1e90ff; /* dodgerblue */
+  --primary-foreground: #ffffff;
+  --muted: #f6f9ff;
+  --border: #e5e7eb;
+  --card: #ffffff;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-card: var(--card);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+}
+
+/* simple components */
+.container {
+  @apply mx-auto max-w-5xl px-4;
+}
+
+.btn {
+  @apply inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-white hover:opacity-90 disabled:opacity-60;
+}
+
+.btn-outline {
+  @apply inline-flex items-center justify-center rounded-md border border-border bg-white px-4 py-2 text-primary hover:bg-muted disabled:opacity-60;
+}
+
+.input {
+  @apply w-full rounded-md border border-border bg-white px-3 py-2 outline-none focus:ring-2 focus:ring-primary;
+}
+
+.select {
+  @apply w-full rounded-md border border-border bg-white px-3 py-2 outline-none focus:ring-2 focus:ring-primary;
+}
+
+.card {
+  @apply rounded-md border border-border bg-card p-4;
+}

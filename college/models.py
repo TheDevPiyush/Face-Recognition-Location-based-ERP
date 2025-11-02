@@ -5,11 +5,14 @@ from django.contrib.auth.models import (
     PermissionsMixin,
     BaseUserManager,
 )
+from django.utils import timezone
 
 
 class University(models.Model):
-    name = models.CharField(max_length=255, unique=True)
-    code = models.CharField(max_length=50, unique=True, null=True, blank=True)
+    name = models.CharField(max_length=255, null=True, blank=True, db_index=True)
+    code = models.CharField(
+        max_length=50, unique=True, null=True, blank=True, db_index=True
+    )
     address = models.TextField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -21,8 +24,8 @@ class Course(models.Model):
     university = models.ForeignKey(
         University, on_delete=models.CASCADE, related_name="courses"
     )
-    name = models.CharField(max_length=255)
-    code = models.CharField(max_length=50, null=True, blank=True)
+    name = models.CharField(max_length=255, null=True, blank=True, db_index=True)
+    code = models.CharField(max_length=50, null=True, blank=True, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -33,19 +36,12 @@ class Batch(models.Model):
     course = models.ForeignKey(
         Course, on_delete=models.CASCADE, related_name="batches", null=True, blank=True
     )  # BCA
-    university = models.ForeignKey(
-        University,
-        on_delete=models.CASCADE,
-        related_name="batches",
-        null=True,
-        blank=True,
-    )  # PPU
     code = models.CharField(max_length=50, null=True, blank=True)  # B2
     start_year = models.IntegerField(null=True, blank=True)  # 2023
     end_year = models.IntegerField(null=True, blank=True)  # 2026
     created_at = models.DateTimeField(auto_now_add=True)
     name = models.CharField(
-        max_length=100, null=True, blank=True
+        max_length=100, null=True, blank=True, db_index=True
     )  # BCA-PPU-B2-2023-2026
 
     def __str__(self):
@@ -71,6 +67,7 @@ class UserManager(BaseUserManager):
         extra_fields.setdefault("is_staff", True)
         extra_fields.setdefault("is_superuser", True)
         extra_fields.setdefault("is_active", True)
+        extra_fields.setdefault("role", User.Role.ADMIN)
 
         if not extra_fields.get("is_staff"):
             raise ValueError("Superuser must have is_staff=True.")
@@ -92,7 +89,9 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     email = models.EmailField(unique=True, null=True, blank=True, db_index=True)
     name = models.CharField(max_length=255, null=True, blank=True, db_index=True)
-    college_id = models.CharField(max_length=255, unique=True, null=True, blank=True, db_index=True)
+    college_id = models.CharField(
+        max_length=255, unique=True, null=True, blank=True, db_index=True
+    )
     role = models.CharField(
         max_length=50,
         choices=Role.choices,
@@ -148,8 +147,8 @@ class Subject(models.Model):
         null=True,
         blank=True,
     )
-    name = models.CharField(max_length=255, db_index=True)
-    code = models.CharField(max_length=50, unique=True)
+    name = models.CharField(max_length=255, db_index=True, null=True, blank=True)
+    code = models.CharField(max_length=50, null=True, blank=True, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -157,14 +156,22 @@ class Subject(models.Model):
 
 
 class Attendance_Window(models.Model):
-    batch = models.ForeignKey(
-        Batch, on_delete=models.CASCADE, related_name="attendance_windows"
+    target_batch = models.ForeignKey(
+        Batch,
+        on_delete=models.CASCADE,
+        related_name="attendance_windows",
+        null=True,
+        blank=True,
     )
-    subject = models.ForeignKey(
-        Subject, on_delete=models.CASCADE, related_name="attendance_windows"
+    target_subject = models.ForeignKey(
+        Subject,
+        on_delete=models.CASCADE,
+        related_name="attendance_windows",
+        null=True,
+        blank=True,
     )
-    start_time = models.TimeField()
-    end_time = models.TimeField()
+    start_time = models.DateTimeField(default=timezone.now)
+    duration = models.IntegerField(default=30)
     is_active = models.BooleanField(default=False)
     last_interacted_by = models.ForeignKey(
         User,
@@ -176,7 +183,7 @@ class Attendance_Window(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.subject.name} ({self.batch.name})"
+        return f"{self.target_subject.name} ({self.target_batch.name})"
 
 
 class Attendance_Record(models.Model):
@@ -187,13 +194,20 @@ class Attendance_Record(models.Model):
         NOT_APPLICABLE = "NA", "Not Applicable"
 
     user = models.ForeignKey(
-        User, on_delete=models.CASCADE, related_name="attendance_records"
+        User, on_delete=models.CASCADE, related_name="attendance_records", db_index=True
     )
     attendance_window = models.ForeignKey(
-        Attendance_Window, on_delete=models.CASCADE, related_name="attendance_records_users"
+        Attendance_Window,
+        on_delete=models.CASCADE,
+        related_name="attendance_records_users",
+        db_index=True,
     )
     status = models.CharField(max_length=255, default=Status.NOT_APPLICABLE)
     created_at = models.DateTimeField(auto_now_add=True)
+    date = models.DateField(default=timezone.localdate)
     marked_by = models.ForeignKey(
-        User, on_delete=models.CASCADE, related_name="attendance_records_marked_by"
+        User,
+        on_delete=models.CASCADE,
+        related_name="attendance_records_marked_by",
+        db_index=True,
     )

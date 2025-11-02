@@ -12,21 +12,34 @@ class UniversitySerializer(serializers.ModelSerializer):
 
 
 class CourseSerializer(serializers.ModelSerializer):
+    # Accept a university id for write; expose nested detail for read
+    university = serializers.PrimaryKeyRelatedField(queryset=University.objects.all())
+    university_detail = UniversitySerializer(read_only=True, source="university")
+
     class Meta:
         model = Course
         fields = "__all__"
 
+    def _compose_name(self, code: str | None, university: University | None, fallback: str | None = None) -> str:
+        parts = []
+        if code:
+            parts.append(str(code))
+        if university and university.code:
+            parts.append(str(university.code))
+        composed = " - ".join(parts)
+        return composed or (fallback or "")
 
-class BatchSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Batch
-        fields = "__all__"
+    def create(self, validated_data):
+        code = validated_data.get("code")
+        uni = validated_data.get("university")
+        validated_data["name"] = self._compose_name(code, uni, validated_data.get("name"))
+        return super().create(validated_data)
 
-
-class SubjectSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Subject
-        fields = "__all__"
+    def update(self, instance, validated_data):
+        code = validated_data.get("code", instance.code)
+        uni = validated_data.get("university", instance.university)
+        validated_data["name"] = self._compose_name(code, uni, instance.name)
+        return super().update(instance, validated_data)
 
 
 class UserAdminSerializer(serializers.ModelSerializer):
@@ -41,7 +54,92 @@ class UserAdminSerializer(serializers.ModelSerializer):
 
 
 class UserPublicSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = User
+        fields = ["id", "name", "email", "role"]
+
+
+class SubjectSerializer(serializers.ModelSerializer):
+    # Accept PK for batch/faculty; compute name using code + batch
+    batch = serializers.PrimaryKeyRelatedField(queryset=Batch.objects.all())
+    faculty = serializers.PrimaryKeyRelatedField(queryset=User.objects.all(), required=False, allow_null=True)
+
+    class Meta:
+        model = Subject
+        fields = "__all__"
+
+    def _compose_name(self, code: str | None, batch: Batch | None, fallback: str | None = None) -> str:
+        parts = []
+        if code:
+            parts.append(str(code))
+        if batch and batch.name:
+            parts.append(str(batch.name))
+        composed = " - ".join(parts)
+        return composed or (fallback or "")
+
+    def create(self, validated_data):
+        code = validated_data.get("code")
+        batch = validated_data.get("batch")
+        validated_data["name"] = self._compose_name(code, batch, validated_data.get("name"))
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        code = validated_data.get("code", instance.code)
+        batch = validated_data.get("batch", instance.batch)
+        validated_data["name"] = self._compose_name(code, batch, instance.name)
+        return super().update(instance, validated_data)
+
+
+class BatchSerializer(serializers.ModelSerializer):
+    # Accept a course id for write; expose nested detail for read
+    course = serializers.PrimaryKeyRelatedField(queryset=Course.objects.all())
+    course_detail = CourseSerializer(read_only=True, source="course")
+    subjects = SubjectSerializer(read_only=True, many=True)
+
+    class Meta:
+        model = Batch
+        fields = "__all__"
+
+    def _compose_name(
+        self,
+        course: Course | None,
+        code: str | None,
+        start_year: int | None,
+        end_year: int | None,
+        fallback: str | None = None,
+    ) -> str:
+        parts = []
+        if course and course.name:
+            parts.append(str(course.name))
+        if code:
+            parts.append(str(code))
+        if start_year and end_year:
+            parts.append(f"{start_year}-{end_year}")
+        composed = "-".join(parts)
+        return composed or (fallback or "")
+
+    def create(self, validated_data):
+        course = validated_data.get("course")
+        code = validated_data.get("code")
+        start_year = validated_data.get("start_year")
+        end_year = validated_data.get("end_year")
+        validated_data["name"] = self._compose_name(course, code, start_year, end_year, validated_data.get("name"))
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        course = validated_data.get("course", instance.course)
+        code = validated_data.get("code", instance.code)
+        start_year = validated_data.get("start_year", instance.start_year)
+        end_year = validated_data.get("end_year", instance.end_year)
+        validated_data["name"] = self._compose_name(course, code, start_year, end_year, instance.name)
+        return super().update(instance, validated_data)
+
+
+class UserStudentSerializer(serializers.ModelSerializer):
     batch = BatchSerializer(read_only=True)
+    role = serializers.CharField(read_only=True)
+
     class Meta:
         model = User
         fields = ["id", "name", "email", "role", "batch"]
@@ -50,4 +148,13 @@ class UserPublicSerializer(serializers.ModelSerializer):
 class Attendance_WindowSerializer(serializers.ModelSerializer):
     class Meta:
         model = Attendance_Window
+        fields = "__all__"
+
+
+class AttendanceRecordSerializer(serializers.ModelSerializer):
+    user = UserPublicSerializer(read_only=True)
+    attendance_window = Attendance_WindowSerializer(read_only=True)
+
+    class Meta:
+        model = Attendance_Record
         fields = "__all__"
