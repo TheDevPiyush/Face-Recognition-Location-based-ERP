@@ -131,7 +131,7 @@ export default function AttendancePage() {
 
           {/* Step 2: Update Location */}
           <section className="rounded-xl border border-border bg-card p-6 shadow-sm">
-            <div className="mb-1 text-lg font-medium">📍 Step 2: Update Location</div>
+            <div className="mb-1 text-lg font-medium">📍Update Location <i>(Testing)</i></div>
             <p className="mb-4 text-xs opacity-70">Allow location access to verify you're on campus</p>
             <button 
               className="btn transition-all hover:-translate-y-0.5" 
