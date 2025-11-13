@@ -223,8 +223,55 @@ export async function updateMyLocation(latitude: number, longitude: number) {
   return apiFetch("/me/location/", { method: "PATCH", body: { latitude, longitude } });
 }
 
-export async function updateProfile(payload: { name?: string | null; email?: string | null; phone?: string | null }) {
-  return apiFetch("/me/", { method: "PATCH", body: payload });
+export async function updateProfile(payload: { name?: string | null; email?: string | null; phone?: string | null; profile_picture?: File }) {
+  const formData = new FormData();
+  
+  if (payload.profile_picture) {
+    formData.append("profile_picture", payload.profile_picture);
+  }
+  if (payload.name !== undefined) {
+    formData.append("name", payload.name ?? "");
+  }
+  if (payload.email !== undefined) {
+    formData.append("email", payload.email ?? "");
+  }
+  if (payload.phone !== undefined) {
+    formData.append("phone", payload.phone ?? "");
+  }
+
+  const token = getAccessToken();
+  const headers: Record<string, string> = {};
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
+  const res = await fetch(`${API_URL}/me/`, {
+    method: "PATCH",
+    headers,
+    body: formData,
+  });
+
+  if (res.status === 401) {
+    const newAccess = await refreshAccessToken();
+    if (newAccess) {
+      const retryRes = await fetch(`${API_URL}/me/`, {
+        method: "PATCH",
+        headers: { ...headers, Authorization: `Bearer ${newAccess}` },
+        body: formData,
+      });
+      if (!retryRes.ok) {
+        const msg = await parseErrorMessage(retryRes);
+        throw new Error(msg);
+      }
+      return (await retryRes.json());
+    }
+    const msg = await parseErrorMessage(res);
+    throw new Error(msg || "Unauthorized");
+  }
+
+  if (!res.ok) {
+    const msg = await parseErrorMessage(res);
+    throw new Error(msg || `Request failed with status ${res.status}`);
+  }
+  return (await res.json());
 }
 
 // Universities
@@ -260,4 +307,18 @@ export async function createUser(payload: {
   return apiFetch("/users/", { method: "POST", body: payload });
 }
 
+export async function createMultipleUsers(
+  payload: Array<{
+    name?: string | null;
+    email: string;
+    password: string;
+    role?: string | null;
+    batch?: number | null;
+  }>
+) {
+  return apiFetch("/users/", {
+    method: "POST",
+    body: payload,
+  });
+}
 

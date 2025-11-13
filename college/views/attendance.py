@@ -47,6 +47,16 @@ class AttendanceWindowView(APIView):
             .first()
         )
 
+        # Check time validity
+        now = timezone.now()
+        window_end = window.start_time + timedelta(seconds=int(window.duration))
+        if now > window_end:
+            Attendance_Window.objects.filter(id=window.id).update(is_active=False)
+            return Response(
+                {"message": "Attendance window is closed"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         if not window:
             return Response(
                 {"message": "Attendance window not found."},
@@ -187,6 +197,9 @@ class AttendanceRecordView(APIView):
         now = timezone.now()
         window_end = window.start_time + timedelta(seconds=int(window.duration))
         if now > window_end:
+            close_window = Attendance_Window.objects.filter(id=window.id).update(
+                is_active=False
+            )
             return Response(
                 {"message": "Attendance window is closed"},
                 status=status.HTTP_400_BAD_REQUEST,
@@ -247,4 +260,3 @@ class AttendanceRecordView(APIView):
             serializer.data,
             status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
         )
-

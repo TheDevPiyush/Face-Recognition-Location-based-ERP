@@ -6,7 +6,7 @@ from django.contrib.auth.models import (
     BaseUserManager,
 )
 from django.utils import timezone
-
+from pgvector.django import VectorField
 
 class University(models.Model):
     name = models.CharField(max_length=255, null=True, blank=True, db_index=True)
@@ -68,12 +68,6 @@ class UserManager(BaseUserManager):
         extra_fields.setdefault("is_superuser", True)
         extra_fields.setdefault("is_active", True)
         extra_fields.setdefault("role", User.Role.ADMIN)
-
-        if not extra_fields.get("is_staff"):
-            raise ValueError("Superuser must have is_staff=True.")
-        if not extra_fields.get("is_superuser"):
-            raise ValueError("Superuser must have is_superuser=True.")
-
         return self.create_user(email, password, **extra_fields)
 
 
@@ -89,6 +83,7 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     email = models.EmailField(unique=True, null=True, blank=True, db_index=True)
     name = models.CharField(max_length=255, null=True, blank=True, db_index=True)
+    image_url = models.CharField(max_length=9999, null=True, blank=True, db_index=True)
     college_id = models.CharField(
         max_length=255, unique=True, null=True, blank=True, db_index=True
     )
@@ -119,6 +114,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     country = models.CharField(max_length=255, null=True, blank=True)
     pincode = models.CharField(max_length=20, null=True, blank=True)
     profile_picture = models.CharField(max_length=255, null=True, blank=True)
+    face_embedding = VectorField(dimensions=128, null=True, blank=True)
 
     # --- status flags ---
     is_active = models.BooleanField(default=True, db_index=True)

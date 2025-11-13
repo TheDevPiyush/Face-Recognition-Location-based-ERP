@@ -2,8 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { fetchMe, fetchSubjects, getWindow, markAttendance, updateMyLocation } from "@/lib/api";
-import Alert from "@/components/Alert";
-import Toast from "@/components/Toast";
+import Alert from "@/app/components/Alert";
+import Toast from "@/app/components/Toast";
 
 export default function AttendancePage() {
   const [me, setMe] = useState<any>(null);
@@ -13,7 +13,7 @@ export default function AttendancePage() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [toasts, setToasts] = useState<Array<{ id: number; message: string; type: "success" | "error" | "info" }>>([]);
-  
+
   const addToast = (message: string, type: "success" | "error" | "info" = "success") => {
     const id = Date.now();
     setToasts((prev) => [...prev, { id, message, type }]);
@@ -102,99 +102,102 @@ export default function AttendancePage() {
   };
 
   return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-semibold">Mark Attendance</h1>
-        <p className="text-sm opacity-80">Select your subject, update your location, then mark attendance if a window is active.</p>
-      </div>
+    <div className="space-y-10">
+      <section className="card-soft relative overflow-hidden px-8 py-10">
+        <div className="pointer-events-none absolute -top-28 right-[-10%] h-64 w-64 rounded-full bg-primary/20 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-28 left-[-15%] h-72 w-72 rounded-full bg-accent/20 blur-3xl" />
+        <div className="relative space-y-4">
+          <span className="badge bg-primary/20 text-primary">Attendance studio</span>
+          <h1 className="section-title text-4xl">Mark your pastel-perfect presence</h1>
+          <p className="section-subtitle max-w-2xl">
+            Follow the soft steps: pick your subject, share your location, and tap in while the window is glowing.
+          </p>
+          {message ? <Alert type="error">{message}</Alert> : null}
+        </div>
+      </section>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Left Column */}
+      <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
         <div className="space-y-6">
-          {/* Step 1: Select Subject */}
-          <section className="rounded-xl border border-border bg-card p-6 shadow-sm">
-            <div className="mb-1 text-lg font-medium">📚 Step 1: Select Subject</div>
-            <p className="mb-4 text-xs opacity-70">Choose the subject you want to mark attendance for</p>
+          <section className="card-soft space-y-5">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="text-lg font-semibold text-foreground">📚 Step 1 · Subject</div>
+                <p className="text-sm text-[var(--muted-foreground)]">
+                  Choose the class you&apos;re attending so we can whisper it to your teacher.
+                </p>
+              </div>
+              <span className="badge bg-accent/20 text-accent-foreground">{mySubjects.length} options</span>
+            </div>
             <div>
-              <label className="mb-1 block text-sm opacity-80">Your Subject</label>
-              <select className="select" value={subjectId} onChange={(e) => setSubjectId(Number(e.target.value))}>
+              <label className="mb-2 block">Your subject</label>
+              <select className="select" value={subjectId ?? ""} onChange={(e) => setSubjectId(Number(e.target.value) || undefined)}>
                 <option value="">Select a subject</option>
                 {mySubjects.map((s) => (
-                  <option key={s.id} value={s.id}>{s.name}</option>
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
                 ))}
               </select>
-              {mySubjects.length === 0 && (
-                <p className="mt-2 text-xs opacity-60">No subjects available for your batch</p>
-              )}
+              {mySubjects.length === 0 ? (
+                <p className="mt-3 text-xs text-[var(--muted-foreground)]">No subjects available yet. Reach out to your faculty 🌼</p>
+              ) : null}
             </div>
           </section>
 
-          {/* Step 2: Update Location */}
-          <section className="rounded-xl border border-border bg-card p-6 shadow-sm">
-            <div className="mb-1 text-lg font-medium">📍Update Location <i>(Testing)</i></div>
-            <p className="mb-4 text-xs opacity-70">Allow location access to verify you're on campus</p>
-            <button 
-              className="btn transition-all hover:-translate-y-0.5" 
-              onClick={useLocation} 
-              disabled={loading}
-            >
-              {loading ? "Updating..." : "📍 Use My Location"}
+          <section className="card-soft space-y-5">
+            <div className="text-lg font-semibold text-foreground">📍 Step 2 · Location (testing)</div>
+            <p className="text-sm text-[var(--muted-foreground)]">
+              Allow location access so we can verify you&apos;re on campus—or within the cozy fence.
+            </p>
+            <button className="btn w-full sm:w-auto" onClick={useLocation} disabled={loading}>
+              {loading ? "Updating..." : "📍 Use my current location"}
             </button>
           </section>
         </div>
 
-        {/* Right Column */}
-        <div>
-          {/* Step 3: Check Window & Mark */}
-          <section className="rounded-xl border border-border bg-card p-6 shadow-sm">
-            <div className="mb-1 text-lg font-medium">✅ Step 3: Mark Your Attendance</div>
-            <p className="mb-4 text-xs opacity-70">Check if the attendance window is open and mark your presence</p>
-            
-            <div className="flex flex-wrap gap-3">
-              <button 
-                className="btn-outline transition-all hover:-translate-y-0.5" 
-                onClick={checkWindow} 
-                disabled={loading || !subjectId}
-              >
-                {loading ? "Checking..." : "🔍 Check Active Window"}
-              </button>
-              <button 
-                className="btn transition-all hover:-translate-y-0.5" 
-                onClick={markMe} 
-                disabled={loading || !windowInfo?.id || !windowInfo?.is_active}
-              >
-                {loading ? "Marking..." : "✓ Mark Attendance"}
-              </button>
-            </div>
+        <section className="card space-y-6">
+          <div>
+            <div className="text-lg font-semibold text-foreground">✅ Step 3 · Attendance glow-up</div>
+            <p className="text-sm text-[var(--muted-foreground)]">
+              Check if the window is open and tap to mark your presence. Don&apos;t forget to smile!
+            </p>
+          </div>
 
-            {windowInfo ? (
-              <div className="mt-6 rounded-lg border border-border bg-muted/40 p-4">
-                <div className="mb-2 text-xs font-medium uppercase tracking-wide opacity-70">Window Status</div>
-                <div className="space-y-2 text-sm">
-                  <div className="flex items-center justify-between">
-                    <span className="opacity-80">Status:</span>
-                    <span className={`font-medium ${windowInfo.is_active ? "text-green-600" : "text-red-600"}`}>
-                      {windowInfo.is_active ? "🟢 Active" : "🔴 Inactive"}
-                    </span>
-                  </div>
-                  {windowInfo.is_active && (
-                    <div className="flex items-center justify-between">
-                      <span className="opacity-80">Duration:</span>
-                      <span className="font-medium">{windowInfo.duration} seconds</span>
-                    </div>
-                  )}
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <button className="btn-outline flex-1" onClick={checkWindow} disabled={loading || !subjectId}>
+              {loading ? "Checking..." : "🔍 Check active window"}
+            </button>
+            <button className="btn flex-1" onClick={markMe} disabled={loading || !windowInfo?.id || !windowInfo?.is_active}>
+              {loading ? "Marking..." : "✓ Mark attendance"}
+            </button>
+          </div>
+
+          {windowInfo ? (
+            <div className="rounded-2xl bg-white/80 px-5 py-4 text-sm text-[var(--muted-foreground)]">
+              <div className="text-xs font-semibold uppercase tracking-[0.18em]">Window status</div>
+              <div className="mt-3 space-y-2 text-sm text-foreground">
+                <div className="flex items-center justify-between">
+                  <span>Status</span>
+                  <span className={`font-semibold ${windowInfo.is_active ? "text-emerald-500" : "text-rose-500"}`}>
+                    {windowInfo.is_active ? "🟢 Active" : "🔴 Inactive"}
+                  </span>
                 </div>
+                {windowInfo.is_active && (
+                  <div className="flex items-center justify-between">
+                    <span>Duration</span>
+                    <span className="font-semibold">{windowInfo.duration} seconds</span>
+                  </div>
+                )}
               </div>
-            ) : (
-              <div className="mt-6 rounded-lg border border-dashed border-border px-4 py-3 text-sm opacity-70">
-                No active window found. Check the window status or contact your teacher.
-              </div>
-            )}
-          </section>
-        </div>
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-dashed border-white/60 px-5 py-4 text-sm text-[var(--muted-foreground)]">
+              No active window right now. Try checking again or message your faculty 💌
+            </div>
+          )}
+        </section>
       </div>
 
-      {/* Toast notifications */}
       {toasts.map((toast) => (
         <Toast key={toast.id} message={toast.message} type={toast.type} onClose={() => removeToast(toast.id)} />
       ))}

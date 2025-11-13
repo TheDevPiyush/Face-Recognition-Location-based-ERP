@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import Header from "@/components/Header";
+import Header from "@/app/components/Header";
 import localFont from "next/font/local";
 
 const myFont = localFont({
@@ -23,11 +23,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body
-        className={`${myFont.variable} antialiased`}
-      >
-        <Header />
-        <main className="container py-6">{children}</main>
+      <body className={`${myFont.variable} antialiased`}>
+        <div className="app-shell">
+          <Header />
+          <main className="container py-10 sm:py-12 lg:py-16">{children}</main>
+        </div>
       </body>
     </html>
   );

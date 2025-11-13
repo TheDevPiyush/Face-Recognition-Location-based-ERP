@@ -16,9 +16,10 @@ import {
   createUser,
   getWindow,
   upsertWindow,
+  createMultipleUsers,
 } from "@/lib/api";
-import Alert from "@/components/Alert";
-import Toast from "@/components/Toast";
+import Alert from "@/app/components/Alert";
+import Toast from "@/app/components/Toast";
 import { useRouter } from "next/navigation";
 
 export default function ManagePage() {
@@ -96,22 +97,50 @@ export default function ManagePage() {
     [subjects, batchId]
   );
 
-  if (loading) return <p>Loading...</p>;
+  if (loading) return <div className="card-soft text-sm text-[var(--muted-foreground)]">Loading your management studio...</div>;
   if (error) return <Alert type="error">{error}</Alert>;
 
   return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-semibold">Manage</h1>
-        <p className="text-sm opacity-80">Create and manage universities, courses, batches, subjects, students, and attendance windows.</p>
-      </div>
+    <div className="space-y-10">
+      <section className="card-soft relative overflow-hidden px-8 py-10">
+        <div className="pointer-events-none absolute -top-28 right-[-10%] h-64 w-64 rounded-full bg-primary/20 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-32 left-[-15%] h-72 w-72 rounded-full bg-accent/20 blur-3xl" />
+        <div className="relative flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+          <div className="space-y-4">
+            <span className="badge bg-primary/20 text-primary">Admin atelier</span>
+            <h1 className="section-title text-4xl">Craft your campus universe</h1>
+            <p className="section-subtitle max-w-2xl">
+              Create universities, courses, subjects, and batches. Everything responds with warm gradients, so managing feels soft.
+            </p>
+          </div>
+          <div className="grid w-full max-w-sm gap-3 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
+            <span className="rounded-2xl bg-white/80 px-4 py-3">
+              Universities · {universities.length}
+            </span>
+            <span className="rounded-2xl bg-white/80 px-4 py-3">
+              Courses · {courses.length}
+            </span>
+            <span className="rounded-2xl bg-white/80 px-4 py-3">
+              Batches · {batches.length}
+            </span>
+          </div>
+        </div>
+      </section>
 
       {/* Progressive selectors */}
-      <section className="rounded-xl border border-border bg-card p-6 shadow-sm">
-        <div className="mb-3 text-lg font-medium">Filter by hierarchy</div>
+      <section className="card-soft space-y-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <div className="text-lg font-semibold text-foreground">Filter by hierarchy</div>
+            <p className="text-sm text-[var(--muted-foreground)]">
+              Narrow down your view to keep your magic focused.
+            </p>
+          </div>
+          <span className="badge bg-accent/20 text-accent-foreground">Lovely filters</span>
+        </div>
         <div className="grid gap-4 sm:grid-cols-3">
           <div>
-            <label className="mb-1 block text-sm">University</label>
+            <label className="mb-2 block">University</label>
             <select className="select" value={universityId} onChange={(e) => setUniversityId(Number(e.target.value) || undefined)}>
               <option value="">All</option>
               {universities.map((u) => (
@@ -120,7 +149,7 @@ export default function ManagePage() {
             </select>
           </div>
           <div>
-            <label className="mb-1 block text-sm">Course</label>
+            <label className="mb-2 block">Course</label>
             <select className="select" value={courseId} onChange={(e) => setCourseId(Number(e.target.value) || undefined)}>
               <option value="">{universityId ? "Select course" : "All"}</option>
               {filteredCourses.map((c) => (
@@ -129,7 +158,7 @@ export default function ManagePage() {
             </select>
           </div>
           <div>
-            <label className="mb-1 block text-sm">Batch</label>
+            <label className="mb-2 block">Batch</label>
             <select className="select" value={batchId} onChange={(e) => setBatchId(Number(e.target.value) || undefined)}>
               <option value="">{courseId ? "Select batch" : "All"}</option>
               {filteredBatches.map((b) => (
@@ -141,7 +170,7 @@ export default function ManagePage() {
       </section>
 
       {/* Two-column grid for create forms */}
-      <div className="space-y-6">
+      <div className="space-y-8">
         {/* Row 1: University + Course */}
         <div className="grid gap-6 lg:grid-cols-2">
           <CreateUniversity
@@ -184,13 +213,22 @@ export default function ManagePage() {
       />
 
       {me?.role === "admin" ? (
-        <CreateStudent
-          batches={filteredBatches}
-          allBatches={batches}
-          defaultBatchId={batchId}
-          onCreated={() => addToast("✅ Student created successfully", "success")}
-          onError={(msg) => addToast(`❌ ${msg}`, "error")}
-        />
+        <>
+          <CreateStudent
+            batches={filteredBatches}
+            allBatches={batches}
+            defaultBatchId={batchId}
+            onCreated={() => addToast("✅ Student created successfully", "success")}
+            onError={(msg) => addToast(`❌ ${msg}`, "error")}
+          />
+          <CreateStudentsFromCSV
+            batches={filteredBatches}
+            allBatches={batches}
+            defaultBatchId={batchId}
+            onCreated={() => addToast("✅ Students created successfully from CSV", "success")}
+            onError={(msg) => addToast(`❌ ${msg}`, "error")}
+          />
+        </>
       ) : null}
 
       {/* Toast notifications */}
@@ -222,9 +260,11 @@ function CreateUniversity({ onCreated, onError }: { onCreated: (u: any) => void;
   };
 
   return (
-    <section className="flex h-full flex-col rounded-xl border border-border bg-card p-8 shadow-sm transition-shadow hover:shadow-md">
-      <div className="mb-1 text-lg font-medium">🏢 Add University</div>
-      <p className="mb-6 text-xs opacity-70">Create a new university in the system</p>
+    <section className="card-soft flex h-full flex-col gap-6 p-8 transition-transform hover:-translate-y-0.5 hover:shadow-xl">
+      <div>
+        <div className="text-lg font-semibold text-foreground">🏢 Add university</div>
+        <p className="text-sm text-[var(--muted-foreground)]">Create a new campus realm with a friendly code.</p>
+      </div>
       <form onSubmit={onSubmit} className="flex flex-1 flex-col space-y-4">
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
@@ -232,14 +272,14 @@ function CreateUniversity({ onCreated, onError }: { onCreated: (u: any) => void;
           </div>
           <div>
             <input className="input" placeholder="University Code" value={code} onChange={(e) => setCode(e.target.value)} required />
-            <p className="mt-1 text-xs opacity-60">Code must be unique</p>
+            <p className="mt-1 text-xs text-[var(--muted-foreground)]">Code must be unique</p>
           </div>
         </div>
         <div>
           <input className="input" placeholder="Address (optional)" value={address} onChange={(e) => setAddress(e.target.value)} />
         </div>
-        <div className="mt-auto! pt-2">
-          <button className="btn transition-all hover:-translate-y-0.5" disabled={loading} type="submit">
+        <div className="pt-2">
+          <button className="btn" disabled={loading} type="submit">
             {loading ? "Creating..." : "Create University"}
           </button>
         </div>
@@ -281,9 +321,11 @@ function CreateCourse({ universities, defaultUniversityId, onCreated, onError }:
   };
 
   return (
-    <section className="flex h-full flex-col rounded-xl border border-border bg-card p-8 shadow-sm transition-shadow hover:shadow-md">
-      <div className="mb-1 text-lg font-medium">🎓 Add Course</div>
-      <p className="mb-6 text-xs opacity-70">Create a new course under a university</p>
+    <section className="card-soft flex h-full flex-col gap-6 p-8 transition-transform hover:-translate-y-0.5 hover:shadow-xl">
+      <div>
+        <div className="text-lg font-semibold text-foreground">🎓 Add course</div>
+        <p className="text-sm text-[var(--muted-foreground)]">Drop a shiny new programme under the right university.</p>
+      </div>
       <form onSubmit={onSubmit} className="flex flex-1 flex-col space-y-4">
         <div>
           <label className="mb-1 block text-sm opacity-80">University</label>
@@ -294,11 +336,11 @@ function CreateCourse({ universities, defaultUniversityId, onCreated, onError }:
         </div>
         <div>
           <input className="input" placeholder="Course code" value={code} onChange={(e) => setCode(e.target.value)} required />
-          <p className="mt-1 text-xs opacity-60">e.g., BCA, MCA, BSc</p>
+          <p className="mt-1 text-xs text-[var(--muted-foreground)]">e.g., BCA, MCA, BSc</p>
         </div>
-        {previewName && <div className="rounded-md bg-muted px-3 py-2 text-sm opacity-70">Preview: {previewName}</div>}
-        <div className="mt-auto! pt-2">
-          <button className="btn transition-all hover:-translate-y-0.5" disabled={loading} type="submit">
+        {previewName && <div className="rounded-2xl bg-white/80 px-4 py-3 text-sm text-[var(--muted-foreground)]">Preview: {previewName}</div>}
+        <div className="pt-2">
+          <button className="btn" disabled={loading} type="submit">
             {loading ? "Creating..." : "Create Course"}
           </button>
         </div>
@@ -347,9 +389,11 @@ function CreateBatch({ courses, allCourses, defaultCourseId, onCreated, onError 
   };
 
   return (
-    <section className="flex h-full flex-col rounded-xl border border-border bg-card p-8 shadow-sm transition-shadow hover:shadow-md">
-      <div className="mb-1 text-lg font-medium">👥 Add Batch</div>
-      <p className="mb-6 text-xs opacity-70">Create a new batch for a course</p>
+    <section className="card-soft flex h-full flex-col gap-6 p-8 transition-transform hover:-translate-y-0.5 hover:shadow-xl">
+      <div>
+        <div className="text-lg font-semibold text-foreground">👥 Add batch</div>
+        <p className="text-sm text-[var(--muted-foreground)]">Gather students into a snug new batch for their course.</p>
+      </div>
       <form onSubmit={onSubmit} className="flex flex-1 flex-col space-y-4">
         <div>
           <label className="mb-1 block text-sm opacity-80">Course</label>
@@ -360,15 +404,15 @@ function CreateBatch({ courses, allCourses, defaultCourseId, onCreated, onError 
         </div>
         <div>
           <input className="input" placeholder="Batch code" value={code} onChange={(e) => setCode(e.target.value)} required />
-          <p className="mt-1 text-xs opacity-60">e.g., B1, B2, A</p>
+          <p className="mt-1 text-xs text-[var(--muted-foreground)]">e.g., B1, B2, A</p>
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <input className="input" placeholder="Start year" required type="number" value={startYear} onChange={(e) => setStartYear(Number(e.target.value) || "")} />
           <input className="input" placeholder="End year" required type="number" value={endYear} onChange={(e) => setEndYear(Number(e.target.value) || "")} />
         </div>
-        {previewName && <div className="rounded-md bg-muted px-3 py-2 text-sm opacity-70">Preview: {previewName}</div>}
-        <div className="mt-auto! pt-2">
-          <button className="btn transition-all hover:-translate-y-0.5" disabled={loading} type="submit">
+        {previewName && <div className="rounded-2xl bg-white/80 px-4 py-3 text-sm text-[var(--muted-foreground)]">Preview: {previewName}</div>}
+        <div className="pt-2">
+          <button className="btn" disabled={loading} type="submit">
             {loading ? "Creating..." : "Create Batch"}
           </button>
         </div>
@@ -411,9 +455,11 @@ function CreateSubject({ batches, allBatches, defaultBatchId, onCreated, onError
   };
 
   return (
-    <section className="flex h-full flex-col rounded-xl border border-border bg-card p-8 shadow-sm transition-shadow hover:shadow-md">
-      <div className="mb-1 text-lg font-medium">🖋️ Add Subject</div>
-      <p className="mb-6 text-xs opacity-70">Create a new subject for a batch</p>
+    <section className="card-soft flex h-full flex-col gap-6 p-8 transition-transform hover:-translate-y-0.5 hover:shadow-xl">
+      <div>
+        <div className="text-lg font-semibold text-foreground">🖋️ Add subject</div>
+        <p className="text-sm text-[var(--muted-foreground)]">Add a lovely subject and tie it neatly to a batch.</p>
+      </div>
       <form onSubmit={onSubmit} className="flex flex-1 flex-col space-y-4">
         <div>
           <label className="mb-1 block text-sm opacity-80">Batch</label>
@@ -424,11 +470,11 @@ function CreateSubject({ batches, allBatches, defaultBatchId, onCreated, onError
         </div>
         <div>
           <input className="input" placeholder="Subject" value={code} onChange={(e) => setCode(e.target.value)} required />
-          <p className="mt-1 text-xs opacity-60">e.g., MATH101, CS201</p>
+          <p className="mt-1 text-xs text-[var(--muted-foreground)]">e.g., MATH101, CS201</p>
         </div>
-        {previewName && <div className="rounded-md bg-muted px-3 py-2 text-sm opacity-70">Preview: {previewName}</div>}
-        <div className="mt-auto! pt-2">
-          <button className="btn transition-all hover:-translate-y-0.5" disabled={loading} type="submit">
+        {previewName && <div className="rounded-2xl bg-white/80 px-4 py-3 text-sm text-[var(--muted-foreground)]">Preview: {previewName}</div>}
+        <div className="pt-2">
+          <button className="btn" disabled={loading} type="submit">
             {loading ? "Creating..." : "Create Subject"}
           </button>
         </div>
@@ -499,19 +545,24 @@ function ManageWindow({ batches, subjects, onUpdated, onError }: { batches: any[
   };
 
   return (
-    <section className="rounded-xl border border-border bg-card p-8 shadow-sm">
-      <div className="mb-1 text-lg font-medium">🪟 Attendance Window</div>
-      <p className="mb-6 text-xs opacity-70">Open or close attendance windows for a subject</p>
+    <section className="card space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <div className="text-lg font-semibold text-foreground">🪟 Attendance window</div>
+          <p className="text-sm text-[var(--muted-foreground)]">Open or close the attendance window for a chosen subject.</p>
+        </div>
+        <span className="badge bg-primary/15 text-primary">Window controls</span>
+      </div>
       <div className="grid gap-4 sm:grid-cols-3">
         <div>
-          <label className="mb-1 block text-sm opacity-80">Batch</label>
+          <label className="mb-2 block">Batch</label>
           <select className="select" value={batch} onChange={(e) => setBatch(Number(e.target.value) || undefined)}>
             <option value="">Select batch</option>
             {batches.map((b) => <option key={b.id} value={b.id}>{b.name || b.code || `#${b.id}`}</option>)}
           </select>
         </div>
         <div>
-          <label className="mb-1 block text-sm opacity-80">Subject</label>
+          <label className="mb-2 block">Subject</label>
           <select className="select" value={subject} onChange={(e) => setSubject(Number(e.target.value) || undefined)}>
             <option value="">{batch ? (subjectsForBatch.length ? "Select subject" : "No subjects available") : "Select batch first"}</option>
             {subjectsForBatch.map((s) => (
@@ -520,31 +571,35 @@ function ManageWindow({ batches, subjects, onUpdated, onError }: { batches: any[
           </select>
         </div>
         <div>
-          <label className="mb-1 block text-sm opacity-80">Duration (secs)</label>
+          <label className="mb-2 block">Duration (secs)</label>
           <input className="input" type="number" min={30} value={durationSec} onChange={(e) => setDurationSec(Number(e.target.value) || 30)} />
         </div>
       </div>
       <div className="mt-4 flex flex-wrap gap-3">
-        <button className="btn-outline transition-all hover:-translate-y-0.5" onClick={refresh}>Check current window</button>
-        <button className="btn transition-all hover:-translate-y-0.5" onClick={openWindow} disabled={loading}>Open window</button>
-        <button className="btn-outline transition-all hover:-translate-y-0.5" onClick={closeWindow} disabled={loading}>Close window</button>
+        <button className="btn-outline" onClick={refresh}>Check current window</button>
+        <button className="btn" onClick={openWindow} disabled={loading}>Open window</button>
+        <button className="btn-outline" onClick={closeWindow} disabled={loading}>Close window</button>
       </div>
       {windowInfo ? (
-        <div className="mt-4 rounded-md bg-muted px-3 py-2 text-sm opacity-80">
-          Status:{" "}
-          <span className="font-medium">
-            {windowInfo.is_active ? "Active" : "Inactive"}
-          </span>
-
-          {windowInfo.is_active && (
-            <>
-              {" "} | Duration (secs):{" "}
-              <span className="font-medium">{windowInfo.duration}</span>
-            </>
-          )}
+        <div className="mt-4 rounded-2xl bg-white/80 px-5 py-4 text-sm text-[var(--muted-foreground)]">
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="badge bg-primary/20 text-primary">
+              Window #{windowInfo.id}
+            </span>
+            <span className="text-base font-medium text-foreground">
+              {windowInfo.is_active ? "🟢 Active" : "🔴 Inactive"}
+            </span>
+            {windowInfo.is_active && (
+              <span className="text-xs font-semibold uppercase tracking-[0.18em]">
+                Duration · {windowInfo.duration} seconds
+              </span>
+            )}
+          </div>
         </div>
       ) : (
-        <div className="mt-4 text-sm opacity-70">No window found</div>
+        <div className="mt-4 rounded-2xl border border-dashed border-white/60 px-5 py-4 text-sm text-[var(--muted-foreground)]">
+          No window found. Open one when your students are ready 🌸
+        </div>
       )}
     </section>
   );
@@ -575,12 +630,14 @@ function CreateStudent({ batches, allBatches, defaultBatchId, onCreated, onError
   };
 
   return (
-    <section className="rounded-xl border border-border bg-card p-8 shadow-sm">
-      <div className="mb-1 text-lg font-medium">👤 Add Student</div>
-      <p className="mb-6 text-xs opacity-70">Create a new student account</p>
+    <section className="card space-y-6">
+      <div>
+        <div className="text-lg font-semibold text-foreground">👤 Add student</div>
+        <p className="text-sm text-[var(--muted-foreground)]">Create a new student account and sprinkle credentials their way.</p>
+      </div>
       <form onSubmit={onSubmit} className="space-y-4">
         <div>
-          <label className="mb-1 block text-sm opacity-80">Batch</label>
+          <label className="mb-2 block">Batch</label>
           <select className="select" value={batch} onChange={(e) => setBatch(Number(e.target.value) || undefined)}>
             <option value="">Select batch</option>
             {(batches.length ? batches : allBatches).map((b) => <option key={b.id} value={b.id}>{b.name || b.code || `#${b.id}`}</option>)}
@@ -593,10 +650,246 @@ function CreateStudent({ batches, allBatches, defaultBatchId, onCreated, onError
           <input className="input" type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required />
           <input className="input" type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} required />
         </div>
-        <button className="btn transition-all hover:-translate-y-0.5" disabled={loading} type="submit">
+        <button className="btn" disabled={loading} type="submit">
           {loading ? "Creating..." : "Create Student"}
         </button>
       </form>
     </section>
+  );
+}
+
+function CreateStudentsFromCSV({ batches, allBatches, defaultBatchId, onCreated, onError }: { batches: any[]; allBatches: any[]; defaultBatchId?: number; onCreated: () => void; onError: (msg: string) => void }) {
+  const [showModal, setShowModal] = useState(false);
+  const [csvData, setCsvData] = useState<Array<{ name: string; email: string; password: string }>>([]);
+  const [batch, setBatch] = useState<number | undefined>(defaultBatchId);
+  const [processing, setProcessing] = useState(false);
+
+  useEffect(() => { setBatch(defaultBatchId); }, [defaultBatchId]);
+
+  const parseCSV = (text: string): Array<{ name: string; email: string; password: string }> => {
+    const lines = text.trim().split("\n");
+    if (lines.length < 2) throw new Error("CSV must have at least a header and one data row");
+
+    // Simple CSV parser that handles quoted fields
+    const parseCSVLine = (line: string): string[] => {
+      const result: string[] = [];
+      let current = "";
+      let inQuotes = false;
+
+      for (let i = 0; i < line.length; i++) {
+        const char = line[i];
+        if (char === '"') {
+          inQuotes = !inQuotes;
+        } else if (char === "," && !inQuotes) {
+          result.push(current.trim());
+          current = "";
+        } else {
+          current += char;
+        }
+      }
+      result.push(current.trim());
+      return result;
+    };
+
+    const header = parseCSVLine(lines[0]).map((h) => h.replace(/^"|"$/g, "").trim().toLowerCase());
+    const nameIdx = header.findIndex((h) => h === "name");
+    const emailIdx = header.findIndex((h) => h === "email");
+    const passwordIdx = header.findIndex((h) => h === "password");
+
+    if (nameIdx === -1 || emailIdx === -1 || passwordIdx === -1) {
+      throw new Error("CSV must have 'name', 'email', and 'password' columns");
+    }
+
+    const data: Array<{ name: string; email: string; password: string }> = [];
+    for (let i = 1; i < lines.length; i++) {
+      const values = parseCSVLine(lines[i]).map((v) => v.replace(/^"|"$/g, "").trim());
+      if (values.length < Math.max(nameIdx, emailIdx, passwordIdx) + 1) continue;
+
+      const name = values[nameIdx] || "";
+      const email = values[emailIdx] || "";
+      const password = values[passwordIdx] || "";
+
+      if (!email || !password) continue;
+
+      data.push({ name, email, password });
+    }
+
+    return data;
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const text = await file.text();
+      const parsed = parseCSV(text);
+      if (parsed.length === 0) {
+        onError("No valid data found in CSV");
+        return;
+      }
+      setCsvData(parsed);
+      setShowModal(true);
+    } catch (err: any) {
+      onError(err.message || "Failed to parse CSV file");
+    }
+
+    // Reset input
+    e.target.value = "";
+  };
+
+  const handleCreateUsers = async () => {
+    if (!batch) {
+      onError("Select a batch");
+      return;
+    }
+    if (csvData.length === 0) {
+      onError("No data to create");
+      return;
+    }
+
+    setProcessing(true);
+
+    await createMultipleUsers(csvData)
+
+    setProcessing(false);
+    setShowModal(false);
+    setCsvData([]);
+    onCreated()
+  };
+
+  return (
+    <>
+      <section className="card space-y-6">
+        <div>
+          <div className="text-lg font-semibold text-foreground">📄 Import students from CSV</div>
+          <p className="text-sm text-[var(--muted-foreground)]">Upload a CSV file with name, email, and password columns to create multiple students at once.</p>
+        </div>
+        <div>
+          <label className="block cursor-pointer">
+            <input
+              type="file"
+              accept=".csv"
+              onChange={handleFileChange}
+              className="hidden"
+            />
+            <div className="btn-outline inline-block">Choose CSV File</div>
+          </label>
+          <p className="mt-2 text-xs text-[var(--muted-foreground)]">
+            CSV format: name,email,password (header row required)
+          </p>
+        </div>
+      </section>
+
+      {showModal && (
+        <CSVPreviewModal
+          data={csvData}
+          batch={batch}
+          batches={batches.length ? batches : allBatches}
+          onBatchChange={setBatch}
+          onConfirm={handleCreateUsers}
+          onClose={() => {
+            setShowModal(false);
+            setCsvData([]);
+          }}
+          processing={processing}
+        />
+      )}
+    </>
+  );
+}
+
+function CSVPreviewModal({
+  data,
+  batch,
+  batches,
+  onBatchChange,
+  onConfirm,
+  onClose,
+  processing,
+}: {
+  data: Array<{ name: string; email: string; password: string }>;
+  batch: number | undefined;
+  batches: any[];
+  onBatchChange: (batch: number | undefined) => void;
+  onConfirm: () => void;
+  onClose: () => void;
+  processing: boolean;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+      <div className="card-soft max-h-[90vh] w-full max-w-4xl space-y-6 overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="text-xl font-semibold text-foreground">📋 CSV Preview</div>
+            <p className="text-sm text-[var(--muted-foreground)]">
+              Review {data.length} student{data.length !== 1 ? "s" : ""} before creating
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="rounded-lg px-3 py-1.5 text-sm font-medium text-[var(--muted-foreground)] hover:bg-white/10"
+            disabled={processing}
+          >
+            ✕
+          </button>
+        </div>
+
+        <div>
+          <label className="mb-2 block font-medium">Select Batch *</label>
+          <select
+            className="select"
+            value={batch || ""}
+            onChange={(e) => onBatchChange(Number(e.target.value) || undefined)}
+            disabled={processing}
+          >
+            <option value="">Select batch</option>
+            {batches.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.name || b.code || `#${b.id}`}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse">
+            <thead>
+              <tr className="border-b border-white/20">
+                <th className="px-4 py-2 text-left text-sm font-semibold text-foreground">Name</th>
+                <th className="px-4 py-2 text-left text-sm font-semibold text-foreground">Email</th>
+                <th className="px-4 py-2 text-left text-sm font-semibold text-foreground">Password</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.map((row, idx) => (
+                <tr key={idx} className="border-b border-white/10">
+                  <td className="px-4 py-2 text-sm text-[var(--muted-foreground)]">{row.name || <span className="italic opacity-50">(empty)</span>}</td>
+                  <td className="px-4 py-2 text-sm text-foreground">{row.email}</td>
+                  <td className="px-4 py-2 text-sm text-[var(--muted-foreground)]">{"•".repeat(Math.min(row.password.length, 8))}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="flex gap-3">
+          <button
+            className="btn flex-1"
+            onClick={onConfirm}
+            disabled={!batch || processing}
+          >
+            {processing ? "Creating..." : `Create ${data.length} Student${data.length !== 1 ? "s" : ""}`}
+          </button>
+          <button
+            className="btn-outline"
+            onClick={onClose}
+            disabled={processing}
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }

@@ -20,7 +20,12 @@ class CourseSerializer(serializers.ModelSerializer):
         model = Course
         fields = "__all__"
 
-    def _compose_name(self, code: str | None, university: University | None, fallback: str | None = None) -> str:
+    def _compose_name(
+        self,
+        code: str | None,
+        university: University | None,
+        fallback: str | None = None,
+    ) -> str:
         parts = []
         if code:
             parts.append(str(code))
@@ -32,7 +37,9 @@ class CourseSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         code = validated_data.get("code")
         uni = validated_data.get("university")
-        validated_data["name"] = self._compose_name(code, uni, validated_data.get("name"))
+        validated_data["name"] = self._compose_name(
+            code, uni, validated_data.get("name")
+        )
         return super().create(validated_data)
 
     def update(self, instance, validated_data):
@@ -50,26 +57,23 @@ class UserAdminSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
     def create(self, validated_data):
-        return User.objects.create_user(**validated_data)
-
-
-class UserPublicSerializer(serializers.ModelSerializer):
-
-    class Meta:
-        model = User
-        fields = ["id", "name", "email", "role"]
+        return User.objects.create_user(**validated_data)  # type: ignore
 
 
 class SubjectSerializer(serializers.ModelSerializer):
     # Accept PK for batch/faculty; compute name using code + batch
     batch = serializers.PrimaryKeyRelatedField(queryset=Batch.objects.all())
-    faculty = serializers.PrimaryKeyRelatedField(queryset=User.objects.all(), required=False, allow_null=True)
+    faculty = serializers.PrimaryKeyRelatedField(
+        queryset=User.objects.all(), required=False, allow_null=True
+    )
 
     class Meta:
         model = Subject
         fields = "__all__"
 
-    def _compose_name(self, code: str | None, batch: Batch | None, fallback: str | None = None) -> str:
+    def _compose_name(
+        self, code: str | None, batch: Batch | None, fallback: str | None = None
+    ) -> str:
         parts = []
         if code:
             parts.append(str(code))
@@ -81,7 +85,9 @@ class SubjectSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         code = validated_data.get("code")
         batch = validated_data.get("batch")
-        validated_data["name"] = self._compose_name(code, batch, validated_data.get("name"))
+        validated_data["name"] = self._compose_name(
+            code, batch, validated_data.get("name")
+        )
         return super().create(validated_data)
 
     def update(self, instance, validated_data):
@@ -124,7 +130,9 @@ class BatchSerializer(serializers.ModelSerializer):
         code = validated_data.get("code")
         start_year = validated_data.get("start_year")
         end_year = validated_data.get("end_year")
-        validated_data["name"] = self._compose_name(course, code, start_year, end_year, validated_data.get("name"))
+        validated_data["name"] = self._compose_name(
+            course, code, start_year, end_year, validated_data.get("name")
+        )
         return super().create(validated_data)
 
     def update(self, instance, validated_data):
@@ -132,17 +140,19 @@ class BatchSerializer(serializers.ModelSerializer):
         code = validated_data.get("code", instance.code)
         start_year = validated_data.get("start_year", instance.start_year)
         end_year = validated_data.get("end_year", instance.end_year)
-        validated_data["name"] = self._compose_name(course, code, start_year, end_year, instance.name)
+        validated_data["name"] = self._compose_name(
+            course, code, start_year, end_year, instance.name
+        )
         return super().update(instance, validated_data)
 
 
 class UserStudentSerializer(serializers.ModelSerializer):
     batch = BatchSerializer(read_only=True)
-    role = serializers.CharField(read_only=True)
 
     class Meta:
         model = User
-        fields = ["id", "name", "email", "role", "batch"]
+        fields = ["id", "name", "email", "role", "batch", "profile_picture"]
+        read_only_fields = ["id", "name", "email", "role", "batch"]
 
 
 class Attendance_WindowSerializer(serializers.ModelSerializer):
@@ -152,7 +162,7 @@ class Attendance_WindowSerializer(serializers.ModelSerializer):
 
 
 class AttendanceRecordSerializer(serializers.ModelSerializer):
-    user = UserPublicSerializer(read_only=True)
+    user = UserStudentSerializer(read_only=True)
     attendance_window = Attendance_WindowSerializer(read_only=True)
 
     class Meta:

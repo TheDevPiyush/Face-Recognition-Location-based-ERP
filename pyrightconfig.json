@@ -1,0 +1,12 @@
+{
+    "typeCheckingMode": "basic",
+    "reportMissingTypeStubs": false,
+    "reportUnknownMemberType": false,
+    "reportUnknownVariableType": false,
+    "reportAttributeAccessIssue": false,
+    "exclude": [
+      "**/migrations/**",
+      "**/__pycache__/**"
+    ]
+  }
+  
