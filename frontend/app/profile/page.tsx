@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { fetchMe, setCurrentUser, updateProfile } from "@/lib/api";
 import Alert from "@/app/components/Alert";
+import Toast from "@/app/components/Toast";
+import { PencilIcon } from "lucide-react";
 
 export default function ProfilePage() {
   const [me, setMe] = useState<any>(null);
@@ -12,6 +14,16 @@ export default function ProfilePage() {
   const [uploading, setUploading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // toast notifications
+  const [toasts, setToasts] = useState<Array<{ id: number; message: string; type: "success" | "error" | "info" }>>([]);
+  const addToast = (message: string, type: "success" | "error" | "info" = "success") => {
+    const id = Date.now();
+    setToasts((prev) => [...prev, { id, message, type }]);
+  };
+  const removeToast = (id: number) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  };
 
   useEffect(() => {
     (async () => {
@@ -35,8 +47,11 @@ export default function ProfilePage() {
       setMe(updated);
       setCurrentUser(updated);
       setMessage("Profile updated");
+      addToast("✅ Profile updated successfully", "success");
     } catch (e: any) {
-      setMessage(e.message);
+      const errorMessage = e.message || "Failed to update profile";
+      setMessage(errorMessage);
+      addToast(`❌ ${errorMessage}`, "error");
     } finally {
       setSaving(false);
     }
@@ -53,8 +68,11 @@ export default function ProfilePage() {
       setMe(updated);
       setCurrentUser(updated);
       setMessage("Profile picture updated");
+      addToast("✅ Profile picture updated successfully", "success");
     } catch (e: any) {
-      setMessage(e.message || "Failed to upload profile picture");
+      const errorMessage = e.message || "Failed to upload profile picture";
+      setMessage(errorMessage);
+      addToast(`❌ ${errorMessage}`, "error");
     } finally {
       setUploading(false);
       if (fileInputRef.current) {
@@ -72,6 +90,8 @@ export default function ProfilePage() {
 
   const profilePicture = me?.profile_picture || me?.image_url;
 
+  if (!me) return null;
+
   return (
     <div className="space-y-10">
       <section className="card-soft relative overflow-hidden px-8 py-10">
@@ -79,18 +99,19 @@ export default function ProfilePage() {
         <div className="pointer-events-none absolute -bottom-32 left-[-15%] h-72 w-72 rounded-full bg-accent/20 blur-3xl" />
         <div className="relative flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <span className="badge bg-primary/20 text-primary">Profile bloom</span>
-            <h1 className="section-title mt-4 text-4xl">Spruce up your cosy profile</h1>
+            <h1 className="section-title mt-4 text-4xl">{me?.name}'s Profile</h1>
             <p className="section-subtitle mt-3 max-w-xl">
-              Update your details, peek at your role, and let your digital self sparkle just like you do on campus.
+              Report to admins for any changes.
             </p>
           </div>
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
             disabled={uploading}
-            className="relative flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-3xl border border-white/70 bg-white/80 text-3xl font-semibold text-primary shadow-lg backdrop-blur-xl transition-opacity hover:opacity-80 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="relative cursor-pointer flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-3xl border border-white/70 bg-white/80 text-3xl font-semibold text-primary shadow-lg backdrop-blur-xl transition-opacity hover:opacity-80 disabled:opacity-50 disabled:cursor-not-allowed"
           >
+            <PencilIcon className="absolute animate-pulse bottom-3 right-2 h-6 w-6 text-primary bg-white rounded-full p-1 shadow-lg" />
+
             {profilePicture ? (
               <img
                 src={profilePicture}
@@ -105,7 +126,7 @@ export default function ProfilePage() {
             )}
             {uploading && (
               <div className="absolute inset-0 flex items-center justify-center bg-black/20 backdrop-blur-sm">
-                <span className="text-sm">Uploading...</span>
+                <span className="text-sm animate-spin border-t-3 border-b-3 border-white rounded-full p-2"></span>
               </div>
             )}
           </button>
@@ -123,11 +144,11 @@ export default function ProfilePage() {
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <label className="mb-2 block">Full name</label>
-            <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="Your lovely name" />
+            <input className="input" disabled value={name} onChange={(e) => setName(e.target.value)} placeholder="Your lovely name" />
           </div>
           <div>
             <label className="mb-2 block">Email</label>
-            <input className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@cimage.edu" />
+            <input className="input" disabled type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@cimage.edu" />
           </div>
           <div>
             <label className="mb-2 block">Role</label>
@@ -138,7 +159,7 @@ export default function ProfilePage() {
             <input className="input" value={me?.batch?.name || ""} disabled />
           </div>
         </div>
-        {message ? (
+        {/* {message ? (
           <Alert type={message === "Profile updated" || message === "Profile picture updated" ? "success" : "info"} dismissible>
             {message}
           </Alert>
@@ -150,8 +171,13 @@ export default function ProfilePage() {
           <span className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
             Last updated · {me?.updated_at ? new Date(me.updated_at).toLocaleString() : "Just now"}
           </span>
-        </div>
+        </div> */}
       </form>
+
+      {/* Toast notifications */}
+      {toasts.map((toast) => (
+        <Toast key={toast.id} message={toast.message} type={toast.type} onClose={() => removeToast(toast.id)} />
+      ))}
     </div>
   );
 }

@@ -268,10 +268,11 @@ export async function updateProfile(payload: { name?: string | null; email?: str
   }
 
   if (!res.ok) {
-    const msg = await parseErrorMessage(res);
-    throw new Error(msg || `Request failed with status ${res.status}`);
+    const errorMessage = (await res.json())?.error;
+    throw new Error(errorMessage || `Request failed with status ${res.status}`);
   }
-  return (await res.json());
+  const data = await res.json();
+  return data;
 }
 
 // Universities

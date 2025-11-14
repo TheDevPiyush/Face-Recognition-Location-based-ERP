@@ -9,6 +9,7 @@ from rest_framework import status
 
 from college.utils.check_roles import check_allow_roles
 from services import upload_to_supabase
+from services.face_recognition import has_face
 from ..serializers import *
 from ..models import *
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -117,26 +118,43 @@ class CurrentUserView(APIView):
     # -----------------------------
     # PATCH: Update current user
     # -----------------------------
+
     def patch(self, request):
         user = request.user
         data = request.data.copy()
 
-        # 1. Handle image upload if present
+        if not user.can_update_picture:
+            return Response(
+                {"error": "You Require Admin Approval To Update Image"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
         image_file = request.FILES.get("profile_picture")
+
         if image_file:
+
+            has_face_flag, encoding = has_face(image_file)
+
+            if not has_face_flag:
+                return Response(
+                    {"error": "No human face detected in the image."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
             try:
-                uploaded_url = upload_to_supabase(image_file)
-                print(uploaded_url)
-                data["profile_picture"] = uploaded_url
+                user.face_embedding = encoding
+                user.save(update_fields=["face_embedding"])
+                uploaded_url = upload_to_supabase(image_file=image_file)
             except Exception as e:
+                print("Upload Error:", e)
                 return Response(
                     {"error": "Image upload failed", "details": str(e)},
                     status=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 )
 
-        # 2. Continue normal update using serializer
-        serializer = UserStudentSerializer(user, data=data, partial=True)
+            data["profile_picture"] = uploaded_url
 
+        # Continue normal update
+        serializer = UserStudentSerializer(user, data=data, partial=True)
         if serializer.is_valid():
             serializer.save(last_interacted_by=request.user)
             return Response(serializer.data, status=status.HTTP_200_OK)

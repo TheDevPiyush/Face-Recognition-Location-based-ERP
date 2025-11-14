@@ -115,11 +115,12 @@ class User(AbstractBaseUser, PermissionsMixin):
     pincode = models.CharField(max_length=20, null=True, blank=True)
     profile_picture = models.CharField(max_length=255, null=True, blank=True)
     face_embedding = VectorField(dimensions=128, null=True, blank=True)
+    can_update_picture = models.BooleanField(default=False, db_index=True) # type: ignore[arg-type]
 
     # --- status flags ---
-    is_active = models.BooleanField(default=True, db_index=True)
-    is_staff = models.BooleanField(default=False, db_index=True)
-    is_deleted = models.BooleanField(default=False)
+    is_active = models.BooleanField(default=True, db_index=True) # type: ignore[arg-type]
+    is_staff = models.BooleanField(default=False, db_index=True) # type: ignore[arg-type]
+    is_deleted = models.BooleanField(default=False) # type: ignore[arg-type]
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -167,8 +168,8 @@ class Attendance_Window(models.Model):
         blank=True,
     )
     start_time = models.DateTimeField(default=timezone.now)
-    duration = models.IntegerField(default=30)
-    is_active = models.BooleanField(default=False)
+    duration = models.IntegerField(default=30) # type: ignore[arg-type]
+    is_active = models.BooleanField(default=False) # type: ignore[arg-type]
     last_interacted_by = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
@@ -198,7 +199,7 @@ class Attendance_Record(models.Model):
         related_name="attendance_records_users",
         db_index=True,
     )
-    status = models.CharField(max_length=255, default=Status.NOT_APPLICABLE)
+    status = models.CharField(max_length=255, default=Status.NOT_APPLICABLE) # type: ignore[arg-type]
     created_at = models.DateTimeField(auto_now_add=True)
     date = models.DateField(default=timezone.localdate)
     marked_by = models.ForeignKey(
