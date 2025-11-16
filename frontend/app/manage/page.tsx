@@ -126,7 +126,7 @@ export default function ManagePage() {
       </section>
 
       {/* Progressive selectors */}
-      <section className="card-soft space-y-6">
+      <section className="card-soft space-y-6 p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <div className="text-lg font-semibold text-foreground">Filter by hierarchy</div>
@@ -543,7 +543,7 @@ function ManageWindow({ batches, subjects, onUpdated, onError }: { batches: any[
   };
 
   return (
-    <section className="card space-y-6">
+    <section className="card space-y-6 p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <div className="text-lg font-semibold text-foreground">🪟 Attendance window</div>
@@ -637,7 +637,7 @@ function CreateStudent({ batches, allBatches, defaultBatchId, onCreated, onError
   };
 
   return (
-    <section className="card space-y-6">
+    <section className="card space-y-6 p-6">
       <div>
         <div className="text-lg font-semibold text-foreground">👤 Add student</div>
         <p className="text-sm text-[var(--muted-foreground)]">Create a new student account and sprinkle credentials their way.</p>
@@ -767,7 +767,7 @@ function CreateStudentsFromCSV({ batches, allBatches, defaultBatchId, onCreated,
 
   return (
     <>
-      <section className="card space-y-6">
+      <section className="card space-y-6 p-6">
         <div>
           <div className="text-lg font-semibold text-foreground">📄 Import students from CSV</div>
           <p className="text-sm text-[var(--muted-foreground)]">Upload a CSV file with name, email, and password columns to create multiple students at once.</p>
@@ -825,7 +825,7 @@ function CSVPreviewModal({
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
-      <div className="card-soft max-h-[90vh] w-full max-w-4xl space-y-6 overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+      <div className="card-soft max-h-[90vh] w-full max-w-4xl space-y-6 overflow-y-auto p-6" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between">
           <div>
             <div className="text-xl font-semibold text-foreground">📋 CSV Preview</div>

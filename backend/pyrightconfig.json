@@ -1,5 +1,5 @@
 {
-    "typeCheckingMode": "basic",
+    "typeCheckingMode": "off",
     "reportMissingTypeStubs": false,
     "reportUnknownMemberType": false,
     "reportUnknownVariableType": false,

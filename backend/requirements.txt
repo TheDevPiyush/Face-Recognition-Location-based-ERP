@@ -10,9 +10,11 @@ deprecation==2.1.0
 Django==5.2.8
 django-cors-headers==4.9.0
 django-filter==25.2
+django-stubs==5.2.7
+django-stubs-ext==5.2.7
 djangorestframework==3.16.1
 djangorestframework_simplejwt==5.5.1
-dlib @ file:///C:/Users/Piyush%20Choudhary/code_projects/CIMAGE/geofence_attendance/dlib-19.24.99-cp312-cp312-win_amd64.whl#sha256=20c62e606ca4c9961305f7be3d03990380d3e6c17f8d27798996e97a73271862
+dlib @ file:///C:/Users/Piyush%20Choudhary/code_projects/CIMAGE/geofence_attendance/backend/dlib-19.24.99-cp312-cp312-win_amd64.whl#sha256=20c62e606ca4c9961305f7be3d03990380d3e6c17f8d27798996e97a73271862
 face-recognition==1.3.0
 face_recognition_models==0.3.0
 h11==0.16.0
@@ -22,9 +24,11 @@ httpcore==1.0.9
 httpx==0.28.1
 hyperframe==6.1.0
 idna==3.11
+jedi==0.19.2
 multidict==6.7.0
 numpy==2.3.4
 packaging==25.0
+parso==0.8.5
 pgvector==0.4.1
 pillow==12.0.0
 postgrest==2.24.0
@@ -45,6 +49,7 @@ StrEnum==0.4.15
 supabase==2.24.0
 supabase-auth==2.24.0
 supabase-functions==2.24.0
+types-PyYAML==6.0.12.20250915
 typing-inspection==0.4.2
 typing_extensions==4.15.0
 tzdata==2025.2
