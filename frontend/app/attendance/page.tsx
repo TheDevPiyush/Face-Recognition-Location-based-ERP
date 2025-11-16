@@ -2,9 +2,14 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { fetchMe, fetchSubjects, getWindow, markAttendance, updateMyLocation } from "@/lib/api";
-import Alert from "@/app/components/Alert";
-import Toast from "@/app/components/Toast";
+import { Alert, AlertDescription } from "@/app/components/ui/alert";
+import { useToast } from "@/app/components/ui/use-toast";
 import CameraModal from "@/app/components/CameraModal";
+import { Button } from "@/app/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/app/components/ui/card";
+import { Badge } from "@/app/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/app/components/ui/select";
+import { Spinner } from "@/app/components/ui/spinner";
 
 export default function AttendancePage() {
   const [me, setMe] = useState<any>(null);
@@ -13,16 +18,17 @@ export default function AttendancePage() {
   const [windowInfo, setWindowInfo] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  const [toasts, setToasts] = useState<Array<{ id: number; message: string; type: "success" | "error" | "info" }>>([]);
   const [isCameraModalOpen, setIsCameraModalOpen] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [remainingSec, setRemainingSec] = useState<number>(0);
+  const { toast } = useToast();
 
   const addToast = (message: string, type: "success" | "error" | "info" = "success") => {
-    const id = Date.now();
-    setToasts((prev) => [...prev, { id, message, type }]);
-  };
-  const removeToast = (id: number) => {
-    setToasts((prev) => prev.filter((t) => t.id !== id));
+    toast({
+      title: type === "error" ? "Error" : type === "success" ? "Success" : "Info",
+      description: message,
+      variant: type === "error" ? "destructive" : type === "success" ? "success" : "default",
+    });
   };
 
   useEffect(() => {
@@ -50,7 +56,7 @@ export default function AttendancePage() {
   const useLocation = () => {
     setMessage(null);
     if (!navigator.geolocation) {
-      addToast("❌ Geolocation not supported", "error");
+      addToast("Geolocation not supported", "error");
       return;
     }
     setLoading(true);
@@ -58,15 +64,15 @@ export default function AttendancePage() {
       async (pos) => {
         try {
           await updateMyLocation(pos.coords.latitude, pos.coords.longitude);
-          addToast("✅ Location updated successfully", "success");
+          addToast("Location updated successfully", "success");
         } catch (e: any) {
-          addToast(`❌ ${e.message}`, "error");
+          addToast(e.message, "error");
         } finally {
           setLoading(false);
         }
       },
       () => {
-        addToast("❌ Please allow location permission", "error");
+        addToast("Please allow location permission", "error");
         setLoading(false);
       }
     );
@@ -75,17 +81,17 @@ export default function AttendancePage() {
   const checkWindow = async () => {
     setMessage(null);
     if (!myBatchId || !subjectId) {
-      addToast("❌ Please select a subject", "error");
+      addToast("Please select a subject", "error");
       return;
     }
     setLoading(true);
     try {
       const w = await getWindow(myBatchId, subjectId);
       setWindowInfo(w);
-      addToast("✅ Window status checked", "success");
+      addToast("Window status checked", "success");
     } catch (e: any) {
       setWindowInfo(null);
-      addToast(`❌ ${e.message}`, "error");
+      addToast(e.message, "error");
     } finally {
       setLoading(false);
     }
@@ -96,16 +102,45 @@ export default function AttendancePage() {
     setIsCameraModalOpen(true);
   };
 
+  // Accurate countdown tied to backend start_time and duration
+  useEffect(() => {
+    const computeRemaining = () => {
+      if (!windowInfo?.is_active) return 0;
+      const dur = Number(windowInfo?.duration ?? 0);
+      const start = windowInfo?.start_time ? new Date(windowInfo.start_time).getTime() : NaN;
+      if (!dur || Number.isNaN(start)) return 0;
+      const now = Date.now();
+      const elapsedSec = Math.floor((now - start) / 1000);
+      return Math.max(0, dur - elapsedSec);
+    };
+
+    setRemainingSec(computeRemaining());
+
+    if (!windowInfo?.is_active) return;
+    const timer = setInterval(() => {
+      setRemainingSec(computeRemaining());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [windowInfo?.id, windowInfo?.is_active, windowInfo?.duration, windowInfo?.start_time]);
+
+  const formatMMSS = (total: number) => {
+    const m = Math.floor(total / 60);
+    const s = total % 60;
+    const mm = String(m).padStart(2, "0");
+    const ss = String(s).padStart(2, "0");
+    return `${mm}:${ss}`;
+  };
+
   const handlePhotoCapture = async (file: File) => {
     if (!windowInfo?.id) return;
-    
+
     setIsUploading(true);
     try {
       await markAttendance(windowInfo.id, file);
-      addToast("✅ Attendance marked successfully", "success");
+      addToast("Attendance marked successfully", "success");
       setIsCameraModalOpen(false);
     } catch (e: any) {
-      addToast(`❌ ${e.message}`, "error");
+      addToast(e.message, "error");
     } finally {
       setIsUploading(false);
     }
@@ -113,104 +148,148 @@ export default function AttendancePage() {
 
   return (
     <div className="space-y-10">
-      <section className="card-soft relative overflow-hidden px-8 py-10">
-        <div className="pointer-events-none absolute -top-28 right-[-10%] h-64 w-64 rounded-full bg-primary/20 blur-3xl" />
-        <div className="pointer-events-none absolute -bottom-28 left-[-15%] h-72 w-72 rounded-full bg-accent/20 blur-3xl" />
-        <div className="relative space-y-4">
-          <span className="badge bg-primary/20 text-primary">Attendance studio</span>
-          <h1 className="section-title text-4xl">Mark your pastel-perfect presence</h1>
-          <p className="section-subtitle max-w-2xl">
-            Follow the soft steps: pick your subject, share your location, and tap in while the window is glowing.
-          </p>
-          {message ? <Alert type="error">{message}</Alert> : null}
-        </div>
-      </section>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-4xl mt-4">Mark Attendance</CardTitle>
+          <CardDescription className="max-w-2xl">
+            Select your subject, check window status, and mark your attendance while the window is active.
+          </CardDescription>
+          {message ? (
+            <Alert variant="destructive" className="mt-4">
+              <AlertDescription>{message}</AlertDescription>
+            </Alert>
+          ) : null}
+        </CardHeader>
+      </Card>
 
-      <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-        <div className="space-y-6">
-          <section className="card-soft space-y-5">
-            <div className="flex items-center justify-between gap-3">
+      <Card>
+        <CardHeader>
+          <CardTitle>Attendance Process</CardTitle>
+          <CardDescription>
+            Follow the steps below to mark your attendance for the selected subject.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Step 1: Subject Selection */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-3">
+              <Badge variant="outline" className="font-mono text-xs">1</Badge>
               <div>
-                <div className="text-lg font-semibold text-foreground">📚 Step 1 · Subject</div>
-                <p className="text-sm text-[var(--muted-foreground)]">
-                  Choose the class you&apos;re attending so we can whisper it to your teacher.
-                </p>
+                <h3 className="text-sm font-semibold">Select Subject</h3>
+                <p className="text-xs text-muted-foreground">Choose the subject you are attending</p>
               </div>
-              <span className="badge bg-accent/20 text-accent-foreground">{mySubjects.length} options</span>
             </div>
-            <div>
-              <label className="mb-2 block">Your subject</label>
-              <select className="select" value={subjectId ?? ""} onChange={(e) => setSubjectId(Number(e.target.value) || undefined)}>
-                <option value="">Select a subject</option>
-                {mySubjects.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
-                ))}
-              </select>
+            <div className="pl-8">
+              <Select value={subjectId?.toString()} onValueChange={(value) => setSubjectId(Number(value) || undefined)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a subject" />
+                </SelectTrigger>
+                <SelectContent>
+                  {mySubjects.map((s) => (
+                    <SelectItem key={s.id} value={s.id.toString()}>
+                      {s.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               {mySubjects.length === 0 ? (
-                <p className="mt-3 text-xs text-[var(--muted-foreground)]">No subjects available yet. Reach out to your faculty 🌼</p>
+                <p className="mt-2 text-xs text-muted-foreground">No subjects available. Please contact your faculty.</p>
               ) : null}
             </div>
-          </section>
-
-          <section className="card-soft space-y-5">
-            <div className="text-lg font-semibold text-foreground">📍 Step 2 · Location (testing)</div>
-            <p className="text-sm text-[var(--muted-foreground)]">
-              Allow location access so we can verify you&apos;re on campus—or within the cozy fence.
-            </p>
-            <button className="btn w-full sm:w-auto" onClick={useLocation} disabled={loading}>
-              {loading ? "Updating..." : "📍 Use my current location"}
-            </button>
-          </section>
-        </div>
-
-        <section className="card space-y-6">
-          <div>
-            <div className="text-lg font-semibold text-foreground">✅ Step 3 · Attendance glow-up</div>
-            <p className="text-sm text-[var(--muted-foreground)]">
-              Check if the window is open and tap to mark your presence. Don&apos;t forget to smile!
-            </p>
           </div>
 
-          <div className="flex flex-col gap-3 sm:flex-row">
-            <button className="btn-outline flex-1" onClick={checkWindow} disabled={loading || !subjectId}>
-              {loading ? "Checking..." : "🔍 Check active window"}
-            </button>
-            <button className="btn flex-1" onClick={markMe} disabled={loading || !windowInfo?.id || !windowInfo?.is_active}>
-              {loading ? "Marking..." : "✓ Mark attendance"}
-            </button>
-          </div>
-
-          {windowInfo ? (
-            <div className="rounded-2xl bg-white/80 px-5 py-4 text-sm text-[var(--muted-foreground)]">
-              <div className="text-xs font-semibold uppercase tracking-[0.18em]">Window status</div>
-              <div className="mt-3 space-y-2 text-sm text-foreground">
-                <div className="flex items-center justify-between">
-                  <span>Status</span>
-                  <span className={`font-semibold ${windowInfo.is_active ? "text-emerald-500" : "text-rose-500"}`}>
-                    {windowInfo.is_active ? "🟢 Active" : "🔴 Inactive"}
-                  </span>
+          {/* Step 2: Location Update (Admin only) */}
+          {me?.role === "admin" && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-3">
+                <Badge variant="outline" className="font-mono text-xs">2</Badge>
+                <div>
+                  <h3 className="text-sm font-semibold">Update Location</h3>
+                  <p className="text-xs text-muted-foreground">Allow location access to verify geofence boundary</p>
                 </div>
-                {windowInfo.is_active && (
-                  <div className="flex items-center justify-between">
-                    <span>Duration</span>
-                    <span className="font-semibold">{windowInfo.duration} seconds</span>
-                  </div>
-                )}
+              </div>
+              <div className="pl-8">
+                <Button onClick={useLocation} disabled={loading} variant="outline">
+                  {loading ? (
+                    <>
+                      <Spinner size="sm" className="mr-2" />
+                      Updating...
+                    </>
+                  ) : (
+                    "Use Current Location"
+                  )}
+                </Button>
               </div>
             </div>
-          ) : (
-            <div className="rounded-2xl border border-dashed border-white/60 px-5 py-4 text-sm text-[var(--muted-foreground)]">
-              No active window right now. Try checking again or message your faculty 💌
-            </div>
           )}
-        </section>
-      </div>
 
-      {toasts.map((toast) => (
-        <Toast key={toast.id} message={toast.message} type={toast.type} onClose={() => removeToast(toast.id)} />
-      ))}
+          {/* Divider */}
+          <div className="border-t border-border/50"></div>
+
+          {/* Step 3: Window Status & Mark Attendance */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-3">
+              <Badge variant="outline" className="font-mono text-xs">{me?.role === "admin" ? "3" : "2"}</Badge>
+              <div>
+                <h3 className="text-sm font-semibold">Check Status & Mark Attendance</h3>
+                <p className="text-xs text-muted-foreground">Verify window status and mark your presence</p>
+              </div>
+            </div>
+            <div className="pl-8 space-y-4">
+              <div className="flex flex-col gap-3 sm:flex-row">
+                <Button variant="outline" className="flex-1" onClick={checkWindow} disabled={loading || !subjectId}>
+                  {loading ? (
+                    <>
+                      <Spinner size="sm" className="mr-2" />
+                      Checking...
+                    </>
+                  ) : (
+                    "Check Window Status"
+                  )}
+                </Button>
+                <Button className="flex-1" onClick={markMe} disabled={loading || !windowInfo?.id || !windowInfo?.is_active}>
+                  {loading ? (
+                    <>
+                      <Spinner size="sm" className="mr-2" />
+                      Marking...
+                    </>
+                  ) : (
+                    "Mark Attendance"
+                  )}
+                </Button>
+              </div>
+
+              {/* Window Status Display */}
+              {windowInfo ? (
+                <div className="rounded-lg border bg-secondary/50 p-4 space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Status</span>
+                    <Badge variant={windowInfo.is_active ? "default" : "secondary"}>
+                      {windowInfo.is_active ? "Active" : "Inactive"}
+                    </Badge>
+                  </div>
+                  {windowInfo.is_active && (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Time left</span>
+                      <span className="font-semibold">{formatMMSS(remainingSec)}</span>
+                    </div>
+                  )}
+                  {windowInfo.id && (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Window ID</span>
+                      <span className="font-mono text-xs">{windowInfo.id}</span>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
+                  No active window available. Please check again or contact your faculty.
+                </div>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <CameraModal
         isOpen={isCameraModalOpen}

@@ -7,7 +7,6 @@ import {
   fetchCourses,
   fetchBatches,
   fetchSubjects,
-  fetchStudents,
   fetchUsersAll,
   createUniversity,
   createCourse,
@@ -70,8 +69,7 @@ export default function ManagePage() {
         setCourses(crs as any[]);
         setBatches(bats as any[]);
         setSubjects(subs as any[]);
-        const studs = await fetchStudents();
-        setStudents(studs as any[]);
+        // Students will be fetched on demand per batch where needed
         if (meRes?.role === "admin") {
           const allUsers = await fetchUsersAll();
           setUsers(allUsers as any[]);
@@ -205,12 +203,12 @@ export default function ManagePage() {
       </div>
 
       {/* Full-width sections */}
-      <ManageWindow
+      {/* <ManageWindow
         batches={filteredBatches}
         subjects={filteredSubjects}
         onUpdated={() => addToast("✅ Attendance window updated", "success")}
         onError={(msg) => addToast(`❌ ${msg}`, "error")}
-      />
+      /> */}
 
       {me?.role === "admin" ? (
         <>
@@ -571,8 +569,17 @@ function ManageWindow({ batches, subjects, onUpdated, onError }: { batches: any[
           </select>
         </div>
         <div>
-          <label className="mb-2 block">Duration (secs)</label>
-          <input className="input" type="number" min={30} value={durationSec} onChange={(e) => setDurationSec(Number(e.target.value) || 30)} />
+          <label className="mb-2 block">Duration (minutes)</label>
+          <select
+            className="select"
+            value={durationSec}
+            onChange={(e) => setDurationSec(Number(e.target.value) || 60)}
+          >
+            <option value={30}>30 secs</option>
+            <option value={60}>1 min</option>
+            <option value={120}>2 min</option>
+            <option value={300}>5 min</option>
+          </select>
         </div>
       </div>
       <div className="mt-4 flex flex-wrap gap-3">

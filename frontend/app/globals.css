@@ -1,30 +1,48 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f7f7ff;
-  --background-secondary: #fbf6ff;
-  --foreground: #1a1331;
-  --muted-foreground: #726f90;
-  --primary: #7c5cff;
-  --primary-foreground: #ffffff;
-  --accent: #ff8fb1;
-  --accent-foreground: #4a1d40;
-  --muted: rgba(124, 92, 255, 0.08);
-  --border: rgba(124, 92, 255, 0.18);
-  --card: rgba(255, 255, 255, 0.86);
-  --shadow-soft: 0 24px 60px -30px rgba(65, 41, 163, 0.45);
-  --shadow-tiny: 0 6px 24px rgba(124, 92, 255, 0.18);
+  --background: 0 0% 98%;
+  --foreground: 222.2 84% 4.9%;
+  --card: 0 0% 100%;
+  --card-foreground: 222.2 84% 4.9%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 222.2 84% 4.9%;
+  --primary: 221.2 83.2% 53.3%;
+  --primary-foreground: 210 40% 98%;
+  --secondary: 210 40% 96.1%;
+  --secondary-foreground: 222.2 47.4% 11.2%;
+  --muted: 210 40% 96.1%;
+  --muted-foreground: 215.4 16.3% 46.9%;
+  --accent: 210 40% 96.1%;
+  --accent-foreground: 222.2 47.4% 11.2%;
+  --destructive: 0 84.2% 60.2%;
+  --destructive-foreground: 210 40% 98%;
+  --border: 214.3 31.8% 88%;
+  --input: 214.3 31.8% 91.4%;
+  --ring: 221.2 83.2% 53.3%;
+  --radius: 0.5rem;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-border: var(--border);
-  --color-card: var(--card);
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
@@ -34,38 +52,10 @@
 }
 
 body {
-  background:
-    radial-gradient(120% 120% at 90% 10%, rgba(255, 175, 204, 0.18), transparent 55%),
-    radial-gradient(120% 120% at 5% 30%, rgba(124, 92, 255, 0.18), transparent 60%),
-    linear-gradient(180deg, var(--background) 0%, var(--background-secondary) 100%);
-  color: var(--foreground);
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
   font-family: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
   min-height: 100vh;
-  position: relative;
-  overflow-x: hidden;
-}
-
-body::before,
-body::after {
-  content: "";
-  position: fixed;
-  width: 520px;
-  height: 520px;
-  background: radial-gradient(circle at center, rgba(255, 255, 255, 0.82) 0%, rgba(255, 255, 255, 0) 70%);
-  filter: blur(6px);
-  opacity: 0.55;
-  pointer-events: none;
-  z-index: 0;
-}
-
-body::before {
-  top: -140px;
-  left: -160px;
-}
-
-body::after {
-  bottom: -180px;
-  right: -140px;
 }
 
 .app-shell {
@@ -110,13 +100,11 @@ label {
 }
 
 .card {
-  @apply rounded-3xl border border-white/60 bg-card p-6 backdrop-blur-xl;
-  box-shadow: var(--shadow-soft);
+  @apply rounded-lg border border-border/30 bg-card text-card-foreground shadow-md;
 }
 
 .card-soft {
-  @apply rounded-3xl border border-white/40 bg-white/75 p-6 backdrop-blur-md;
-  box-shadow: var(--shadow-tiny);
+  @apply rounded-lg border border-border/30 bg-card text-card-foreground shadow-sm;
 }
 
 .section-title {
@@ -124,7 +112,7 @@ label {
 }
 
 .section-subtitle {
-  @apply text-sm font-medium text-[var(--muted-foreground)];
+  @apply text-sm text-muted-foreground;
 }
 
 .badge {
@@ -136,8 +124,7 @@ label {
 }
 
 .grid-card {
-  @apply rounded-3xl border border-white/40 bg-white/80 p-5 backdrop-blur-lg transition-all hover:-translate-y-0.5;
-  box-shadow: var(--shadow-tiny);
+  @apply rounded-lg border border-border/30 bg-card p-5 shadow-sm transition-all hover:shadow-md hover:border-border/50;
 }
 
 .table-soft {
@@ -159,4 +146,8 @@ label {
 
 .table-soft tbody tr:not(:last-child) td {
   @apply border-b border-white/60;
+}
+
+button {
+  cursor: pointer;
 }

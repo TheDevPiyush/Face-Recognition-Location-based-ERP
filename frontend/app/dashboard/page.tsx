@@ -6,13 +6,23 @@ import {
   fetchMe,
   fetchBatches,
   fetchSubjects,
-  fetchStudents,
+  fetchStudentsByBatch,
   getWindow,
   markAttendance,
   upsertWindow,
 } from "@/lib/api";
 import { useRouter } from "next/navigation";
-import Alert from "@/app/components/Alert";
+import { Alert, AlertDescription } from "@/app/components/ui/alert";
+import { useToast } from "@/app/components/ui/use-toast";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/app/components/ui/card";
+import { Badge } from "@/app/components/ui/badge";
+import { Button } from "@/app/components/ui/button";
+import { Label } from "@/app/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/app/components/ui/select";
+import { Input } from "@/app/components/ui/input";
+import { Spinner } from "@/app/components/ui/spinner";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/app/components/ui/table";
+import { Check, CheckCircle, CheckCircle2 } from "lucide-react";
 
 type Batch = { id: number; name: string };
 type Subject = { id: number; name: string; batch: number };
@@ -35,10 +45,7 @@ export default function DashboardPage() {
         setMe(meRes);
         setSubjects(subs as any);
         setBatches(bats as any);
-        if (meRes?.role !== "student") {
-          const studs = await fetchStudents();
-          setStudents(studs as any);
-        }
+        // Do not fetch students here; fetched lazily per selected batch
       } catch (e) {
         setError("Failed to load data");
         router.replace("/login");
@@ -50,67 +57,55 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="card-soft text-center text-sm text-[var(--muted-foreground)]">
-        Loading your dashboard magic...
-      </div>
+      <Card>
+        <CardContent className="py-20 flex items-center justify-center">
+          <Spinner size="lg" />
+        </CardContent>
+      </Card>
     );
   }
-  if (error) return <Alert type="error">{error}</Alert>;
+  if (error) return (
+    <Alert variant="destructive">
+      <AlertDescription>{error}</AlertDescription>
+    </Alert>
+  );
 
-  const displayName = me?.name || me?.email || "friend";
-  const roleLabel = me?.role ? me.role.replace(/\b\w/g, (c: string) => c.toUpperCase()) : "Explorer";
+  const displayName = me?.name || me?.email || "User";
+  const roleLabel = me?.role ? me.role.replace(/\b\w/g, (c: string) => c.toUpperCase()) : "User";
 
   return (
     <div className="space-y-10">
-      <div className="card-soft relative overflow-hidden px-8 py-10">
-        <div className="pointer-events-none absolute -top-24 right-[-20%] h-64 w-64 rounded-full bg-primary/20 blur-3xl" />
-        <div className="pointer-events-none absolute -bottom-32 left-[-10%] h-72 w-72 rounded-full bg-accent/20 blur-3xl" />
-        <div className="relative flex flex-col gap-8 md:flex-row md:items-center md:justify-between">
-          <div className="space-y-4">
-            <span className="badge bg-primary/20 text-primary">Dashboard</span>
-            <h1 className="section-title text-4xl">
-              Hi {displayName.split(" ")[0] || "there"}! 👋
-            </h1>
-            <p className="section-subtitle max-w-xl">
-              Your {roleLabel.toLowerCase()} mission control is ready. Peek at attendance, subjects and joyful campus updates—all
-              wrapped in soft pastel calm.
-            </p>
-            <div className="flex flex-wrap gap-3 pt-2 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
-              <span className="inline-flex items-center gap-2 rounded-full bg-white/70 px-4 py-2">
-                🎓 Role · <span className="text-foreground">{roleLabel}</span>
-              </span>
-              {me?.batch?.name ? (
-                <span className="inline-flex items-center gap-2 rounded-full bg-white/70 px-4 py-2">
-                  🧑‍🤝‍🧑 Batch · <span className="text-foreground">{me.batch.name}</span>
+      <Card>
+        <CardHeader>
+          <div className="flex flex-col gap-8 md:flex-row md:items-center md:justify-between">
+            <div className="space-y-4">
+              <Badge variant="secondary">Dashboard</Badge>
+              <CardTitle className="text-4xl flex items-center gap-2">
+                <span>
+                  Welcome,
                 </span>
-              ) : null}
+                <span className="flex items-end gap-1.5 text-primary"> {displayName.split(" ")[0] || "User"}
+                  {me?.role === "admin" && <CheckCircle className="text-green-500 h-8 w-8" />}
+                </span>
+              </CardTitle>
+              <CardDescription className="max-w-xl">
+                Manage your attendance, view subjects, and access academic information.
+              </CardDescription>
+              <div className="flex flex-wrap gap-3 pt-2">
+                <Badge variant="outline">{roleLabel}</Badge>
+                {me?.batch?.name ? (
+                  <Badge variant="outline">{me.batch.name}</Badge>
+                ) : null}
+              </div>
             </div>
           </div>
-          <div className="grid w-full gap-4 sm:grid-cols-2 md:max-w-sm">
-            <Link href="/attendance" className="grid-card">
-              <div className="flex items-center justify-between text-sm font-medium text-[var(--muted-foreground)]">
-                Attendance
-                <span className="text-lg">🕒</span>
-              </div>
-              <div className="mt-4 text-lg font-semibold text-foreground">Mark my presence</div>
-              <p className="mt-2 text-xs text-[var(--muted-foreground)]">A quick tap keeps you in the clear.</p>
-            </Link>
-            <Link href="/subjects" className="grid-card">
-              <div className="flex items-center justify-between text-sm font-medium text-[var(--muted-foreground)]">
-                Subjects
-                <span className="text-lg">📚</span>
-              </div>
-              <div className="mt-4 text-lg font-semibold text-foreground">Review my subjects</div>
-              <p className="mt-2 text-xs text-[var(--muted-foreground)]">Stay in tune with your schedule.</p>
-            </Link>
-          </div>
-        </div>
-      </div>
+        </CardHeader>
+      </Card>
 
       {me?.role === "student" ? (
         <StudentDashboard me={me} subjects={subjects} />
       ) : (
-        <TeacherPanel subjects={subjects} batches={batches} students={students} />
+        <TeacherPanel subjects={subjects} batches={batches} />
       )}
     </div>
   );
@@ -126,91 +121,101 @@ function StudentDashboard({ me, subjects }: { me: any; subjects: Subject[] }) {
   const quickLinks = [
     {
       href: "/attendance",
-      title: "Mark attendance",
-      emoji: "🪄",
-      description: "Tap in and stay on track",
+      title: "Mark Attendance",
+      description: "Mark your presence for classes",
     },
     {
       href: "/subjects",
-      title: "Explore subjects",
-      emoji: "🌈",
-      description: "Peek at your pastel timetable",
+      title: "View Subjects",
+      description: "View your enrolled subjects",
     },
     {
       href: "/profile",
-      title: "Update profile",
-      emoji: "💖",
-      description: "Keep your details sparkling",
+      title: "Update Profile",
+      description: "Manage your profile information",
     },
   ];
 
   return (
     <div className="space-y-8">
-      <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+      {/* <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
         {quickLinks.map((item) => (
           <Link key={item.href} href={item.href} className="grid-card">
-            <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
-              <span>{item.emoji} Quick link</span>
-              <span>→</span>
+            <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+              <span>Quick Link</span>
             </div>
             <div className="mt-4 text-lg font-semibold text-foreground">{item.title}</div>
-            <p className="mt-2 text-xs text-[var(--muted-foreground)]">{item.description}</p>
+            <p className="mt-2 text-xs text-muted-foreground">{item.description}</p>
           </Link>
         ))}
-      </div>
+      </div> */}
 
-      <div className="card">
-        <div className="flex items-center justify-between gap-2">
-          <div>
-            <div className="text-xl font-semibold text-foreground">Subjects in your batch</div>
-            <p className="mt-1 text-sm text-[var(--muted-foreground)]">
-              A cozy list of everything you&apos;re learning this season.
-            </p>
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between gap-2">
+            <div>
+              <CardTitle>Your Subjects</CardTitle>
+            </div>
+            <Badge variant="secondary">
+              {mySubjects.length} {mySubjects.length === 1 ? "subject" : "subjects"}
+            </Badge>
           </div>
-          <span className="badge bg-accent/20 text-accent-foreground">
-            {mySubjects.length} {mySubjects.length === 1 ? "subject" : "subjects"}
-          </span>
-        </div>
-        {mySubjects.length ? (
-          <div className="mt-6 grid gap-3 sm:grid-cols-2">
-            {mySubjects.slice(0, 6).map((s) => (
-              <div
-                key={s.id}
-                className="flex items-center justify-between rounded-2xl bg-white/80 px-4 py-3 text-sm shadow-inner"
-              >
-                <span className="font-medium text-foreground">{s.name}</span>
-                <span className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
-                  #{s.id}
-                </span>
-              </div>
-            ))}
-            {mySubjects.length > 6 ? (
-              <div className="rounded-2xl bg-white/70 px-4 py-3 text-xs text-[var(--muted-foreground)]">
-                and {mySubjects.length - 6} more lovely subjects...
-              </div>
-            ) : null}
-          </div>
-        ) : (
-          <div className="mt-6 rounded-2xl border border-dashed border-white/60 px-5 py-6 text-sm text-[var(--muted-foreground)]">
-            No subjects found yet. Check back after enrollment updates 💫
-          </div>
-        )}
-      </div>
+        </CardHeader>
+        <CardContent>
+          {mySubjects.length ? (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>ID</TableHead>
+                  <TableHead>Subject Name</TableHead>
+                  <TableHead>Batch</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {mySubjects.map((subject) => (
+                  <TableRow key={subject.id}>
+                    <TableCell className="font-mono text-sm">{subject.id}</TableCell>
+                    <TableCell className="font-medium">{subject.name}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline">{me?.batch?.name || "N/A"}</Badge>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          ) : (
+            <div className="rounded-lg border border-dashed border-border px-5 py-6 text-sm text-muted-foreground text-center">
+              No subjects found. Check back after enrollment updates.
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
 
-function TeacherPanel({ subjects, batches, students }: { subjects: Subject[]; batches: Batch[]; students: Student[] }) {
+function TeacherPanel({ subjects, batches }: { subjects: Subject[]; batches: Batch[] }) {
   const [batchId, setBatchId] = useState<number | undefined>();
   const filteredSubjects = useMemo(
     () => subjects.filter((s) => (batchId ? s.batch === batchId : true)),
     [subjects, batchId]
   );
   const [subjectId, setSubjectId] = useState<number | undefined>();
-  const [durationMin, setDurationMin] = useState<number>(15);
+  const [durationSec, setDurationSec] = useState<number>(30);
   const [windowInfo, setWindowInfo] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [studentsInBatch, setStudentsInBatch] = useState<Student[]>([]);
+  const [studentLoading, setStudentLoading] = useState(false)
+  const [remainingSec, setRemainingSec] = useState<number>(0);
+  const { toast } = useToast();
+  const addToast = (description: string, type: "success" | "error" | "info" = "success") => {
+    toast({
+      title: type === "error" ? "Error" : type === "success" ? "Success" : "Info",
+      description,
+      variant: type === "error" ? "destructive" : type === "success" ? "success" : "default",
+    });
+  };
 
   const refreshWindow = async (b?: number, s?: number) => {
     if (!b || !s) return;
@@ -226,6 +231,55 @@ function TeacherPanel({ subjects, batches, students }: { subjects: Subject[]; ba
     refreshWindow(batchId, subjectId);
   }, [batchId, subjectId]);
 
+  // Manage countdown based on backend start_time and duration for accurate refresh behavior
+  useEffect(() => {
+    const computeRemaining = () => {
+      if (!windowInfo?.is_active) return 0;
+      const dur = Number(windowInfo?.duration ?? 0);
+      const start = windowInfo?.start_time ? new Date(windowInfo.start_time).getTime() : NaN;
+      if (!dur || Number.isNaN(start)) return 0;
+      const now = Date.now();
+      const elapsedSec = Math.floor((now - start) / 1000);
+      return Math.max(0, dur - elapsedSec);
+    };
+
+    setRemainingSec(computeRemaining());
+
+    if (!windowInfo?.is_active) return;
+    const timer = setInterval(() => {
+      setRemainingSec(computeRemaining());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [windowInfo?.id, windowInfo?.is_active, windowInfo?.duration, windowInfo?.start_time]);
+
+  const formatMMSS = (total: number) => {
+    const m = Math.floor(total / 60);
+    const s = total % 60;
+    const mm = String(m).padStart(2, "0");
+    const ss = String(s).padStart(2, "0");
+    return `${mm}:${ss}`;
+  };
+
+  // Fetch students when batch changes
+  useEffect(() => {
+    (async () => {
+      if (!batchId) {
+        setStudentsInBatch([]);
+        setStudentLoading(false)
+        return;
+      }
+      try {
+        setStudentLoading(true)
+        const studs = await fetchStudentsByBatch(batchId);
+        setStudentsInBatch(studs as any);
+        setStudentLoading(false)
+      } catch {
+        setStudentsInBatch([]);
+        setStudentLoading(false)
+      }
+    })();
+  }, [batchId]);
+
   const openWindow = async () => {
     if (!batchId || !subjectId) return;
     setLoading(true);
@@ -235,12 +289,12 @@ function TeacherPanel({ subjects, batches, students }: { subjects: Subject[]; ba
         target_batch: batchId,
         target_subject: subjectId,
         is_active: true,
-        duration: Math.max(1, Math.floor(durationMin)) * 60,
+        duration: durationSec,
       });
       setWindowInfo(res);
-      setMessage("Window opened");
+      addToast("Attendance window opened", "success");
     } catch (e: any) {
-      setMessage(e.message);
+      addToast(e.message || "Failed to open window", "error");
     } finally {
       setLoading(false);
     }
@@ -257,156 +311,181 @@ function TeacherPanel({ subjects, batches, students }: { subjects: Subject[]; ba
         is_active: false,
       });
       setWindowInfo(res);
-      setMessage("Window updated");
+      addToast("Attendance window updated", "success");
     } catch (e: any) {
-      setMessage(e.message);
+      addToast(e.message || "Failed to update window", "error");
     } finally {
       setLoading(false);
     }
   };
 
-  const studentsInBatch = useMemo(
-    () => students.filter((s) => s.batch?.id === batchId),
-    [students, batchId]
-  );
-
-  const markForStudent = async (userId: number) => {
-    if (!windowInfo?.id) return;
-    try {
-      await markAttendance(windowInfo.id, userId);
-      setMessage("Marked present");
-    } catch (e: any) {
-      setMessage(e.message);
-    }
-  };
-
   return (
     <div className="space-y-8">
-      <div className="card-soft space-y-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <div className="text-xl font-semibold text-foreground">Open attendance window</div>
-            <p className="text-sm text-[var(--muted-foreground)]">
-              Choose a batch &amp; subject, then sprinkle in the duration to open the window.
-            </p>
+      <Card>
+        <CardHeader>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <CardTitle>Open Attendance Window</CardTitle>
+              <CardDescription>
+                Select a batch and subject, then set the duration to open the attendance window.
+              </CardDescription>
+            </div>
+            <Badge variant="secondary">Teacher Tools</Badge>
           </div>
-          <span className="badge bg-primary/15 text-primary">Teacher tools</span>
-        </div>
-
-        <div className="grid gap-4 sm:grid-cols-3">
-          <div>
-            <label className="mb-2 block">Batch</label>
-            <select className="select" value={batchId ?? ""} onChange={(e) => setBatchId(Number(e.target.value) || undefined)}>
-              <option value="">Select batch</option>
-              {batches.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.name || `Batch ${b.id}`}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="mb-2 block">Subject</label>
-            <select className="select" value={subjectId ?? ""} onChange={(e) => setSubjectId(Number(e.target.value) || undefined)}>
-              <option value="">Select subject</option>
-              {filteredSubjects.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="mb-2 block">Duration (minutes)</label>
-            <input
-              className="input"
-              type="number"
-              min={1}
-              value={durationMin}
-              onChange={(e) => setDurationMin(Number(e.target.value))}
-            />
-          </div>
-        </div>
-
-        <div className="flex flex-wrap gap-3">
-          <button className="btn" onClick={openWindow} disabled={loading}>
-            Open window
-          </button>
-          <button className="btn-outline" onClick={closeWindow} disabled={loading}>
-            Close window
-          </button>
-          <button className="btn-ghost" onClick={() => refreshWindow(batchId, subjectId)}>
-            Refresh status
-          </button>
-        </div>
-
-        {windowInfo ? (
-          <div className="rounded-2xl bg-white/70 px-5 py-4 text-sm text-[var(--muted-foreground)]">
-            <div className="flex flex-wrap items-center gap-3">
-              <span className="badge bg-primary/20 text-primary">Window #{windowInfo.id}</span>
-              <span className="text-base font-medium text-foreground">
-                {windowInfo.is_active ? "🟢 Active now" : "🔴 Closed"}
-              </span>
-              {windowInfo.duration ? (
-                <span className="text-xs font-semibold uppercase tracking-[0.18em]">
-                  Duration · {windowInfo.duration} seconds
-                </span>
-              ) : null}
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div className="space-y-2">
+              <Label htmlFor="batch-select">Batch</Label>
+              <Select value={batchId?.toString()} onValueChange={(value) => setBatchId(Number(value) || undefined)}>
+                <SelectTrigger id="batch-select">
+                  <SelectValue placeholder="Select batch" />
+                </SelectTrigger>
+                <SelectContent>
+                  {batches.map((b) => (
+                    <SelectItem key={b.id} value={b.id.toString()}>
+                      {b.name || `Batch ${b.id}`}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="subject-select">Subject</Label>
+              <Select value={subjectId?.toString()} onValueChange={(value) => setSubjectId(Number(value) || undefined)}>
+                <SelectTrigger id="subject-select">
+                  <SelectValue placeholder="Select subject" />
+                </SelectTrigger>
+                <SelectContent>
+                  {filteredSubjects.map((s) => (
+                    <SelectItem key={s.id} value={s.id.toString()}>
+                      {s.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="duration">Duration (minutes)</Label>
+              <Select value={String(durationSec)} onValueChange={(value) => setDurationSec(Number(value))}>
+                <SelectTrigger id="duration">
+                  <SelectValue placeholder="Select duration" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="30">30 secs</SelectItem>
+                  <SelectItem value="60">1 min</SelectItem>
+                  <SelectItem value="120">2 min</SelectItem>
+                  <SelectItem value="300">5 min</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
-        ) : (
-          <div className="rounded-2xl border border-dashed border-white/60 px-5 py-4 text-sm text-[var(--muted-foreground)]">
-            No window is active yet. Open one when your class is ready 🌼
-          </div>
-        )}
 
-        {message ? (
-          <Alert type={message.toLowerCase().includes("error") ? "error" : "info"} dismissible>
-            {message}
-          </Alert>
-        ) : null}
-      </div>
-
-      <div className="card">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <div className="text-xl font-semibold text-foreground">Students in batch</div>
-            <p className="text-sm text-[var(--muted-foreground)]">
-              Choose a batch to see who&apos;s buzzing around and mark them present manually if needed.
-            </p>
+          <div className="flex flex-wrap gap-3">
+            <Button onClick={openWindow} disabled={loading}>
+              Open Window
+            </Button>
+            <Button variant="outline" onClick={closeWindow} disabled={loading}>
+              Close Window
+            </Button>
+            <Button variant="ghost" onClick={() => refreshWindow(batchId, subjectId)}>
+              Refresh Status
+            </Button>
           </div>
-          <span className="badge bg-accent/20 text-accent-foreground">
-            {studentsInBatch.length} {studentsInBatch.length === 1 ? "student" : "students"}
-          </span>
-        </div>
-        {batchId ? (
-          <div className="mt-6 space-y-3">
-            {studentsInBatch.map((s) => (
-              <div
-                key={s.id}
-                className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/60 bg-white/80 px-5 py-3 text-sm"
-              >
-                <div>
-                  <div className="font-semibold text-foreground">{s.name || s.email || `#${s.id}`}</div>
-                  <div className="text-xs uppercase tracking-[0.18em] text-[var(--muted-foreground)]">ID · {s.id}</div>
+
+          {windowInfo ? (
+            <Card>
+              <CardContent className="py-4">
+                <div className="flex flex-wrap items-center gap-3">
+                  <Badge variant="secondary">Window #{windowInfo.id}</Badge>
+                  <span className="text-base font-medium text-foreground">
+                    {windowInfo.is_active ? "Active" : "Closed"}
+                  </span>
+                  {windowInfo.duration ? (
+                    <>
+                      {windowInfo.is_active ? (
+                        <div className="ml-auto flex items-center gap-3">
+                          <span className="rounded-md bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary">
+                            {formatMMSS(remainingSec)}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground ml-auto">
+                          Duration: {windowInfo.duration} seconds
+                        </span>
+                      )}
+                    </>
+                  ) : null}
                 </div>
-                <button className="btn" disabled={!windowInfo?.id} onClick={() => markForStudent(s.id)}>
-                  Mark present
-                </button>
-              </div>
-            ))}
-            {studentsInBatch.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-white/60 px-5 py-6 text-sm text-[var(--muted-foreground)]">
-                No students found for the selected batch just yet.
-              </div>
-            ) : null}
+
+                {windowInfo.is_active && windowInfo.duration ? (
+                  <div className="mt-3 h-2 w-full rounded-full bg-muted">
+                    <div
+                      className="h-2 rounded-full bg-primary transition-[width]"
+                      style={{ width: `${Math.max(0, Math.min(100, ((windowInfo.duration - remainingSec) / windowInfo.duration) * 100))}%` }}
+                    />
+                  </div>
+                ) : null}
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardContent className="py-4 text-center text-sm text-muted-foreground">
+                No window is active. Open one when your class is ready.
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Inline alerts replaced by toast notifications for a cleaner UI */}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <CardTitle>Students in Batch</CardTitle>
+              <CardDescription>
+                Select a batch to view students and mark attendance manually if needed.
+              </CardDescription>
+            </div>
+            {!studentLoading ?
+              <Badge variant="secondary">
+                {studentsInBatch.length} {studentsInBatch.length === 1 ? "student" : "students"}
+              </Badge>
+              : (
+                <Badge className="bg-transparent"><Spinner className="bg-transparent"/></Badge>
+              )
+            }
           </div>
-        ) : (
-          <div className="mt-6 rounded-2xl border border-dashed border-white/60 px-5 py-6 text-sm text-[var(--muted-foreground)]">
-            Select a batch above to peek at your lovely learners 🌟
-          </div>
-        )}
-      </div>
+        </CardHeader>
+        <CardContent>
+          {batchId ? (
+            <div className="space-y-3">
+              {studentsInBatch.map((s) => (
+                <div
+                  key={s.id}
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-secondary/50 px-5 py-3 text-sm"
+                >
+                  <div>
+                    <div className="font-semibold text-foreground">{s.name || s.email || `#${s.id}`}</div>
+                    <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">ID: {s.id}</div>
+                  </div>
+                </div>
+              ))}
+              {studentsInBatch.length === 0 ? (
+                <div className="rounded-lg border border-dashed border-border px-5 py-6 text-sm text-muted-foreground text-center">
+                  No students found for the selected batch.
+                </div>
+              ) : null}
+            </div>
+          ) : (
+            <div className="rounded-lg border border-dashed border-border px-5 py-6 text-sm text-muted-foreground text-center">
+              Select a batch above to view students.
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

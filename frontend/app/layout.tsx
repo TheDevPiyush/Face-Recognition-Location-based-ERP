@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Header from "@/app/components/Header";
+import { Toaster } from "@/app/components/ui/toaster";
 import localFont from "next/font/local";
 
 const myFont = localFont({
@@ -28,6 +29,7 @@ export default function RootLayout({
           <Header />
           <main className="container py-10 sm:py-12 lg:py-16">{children}</main>
         </div>
+        <Toaster />
       </body>
     </html>
   );

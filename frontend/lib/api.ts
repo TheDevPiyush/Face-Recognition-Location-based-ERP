@@ -198,6 +198,10 @@ export async function fetchStudents() {
   return apiFetch("/users/students/");
 }
 
+export async function fetchStudentsByBatch(batchId: number) {
+  return apiFetch(`/users/students/${batchId}/`);
+}
+
 export async function getWindow(target_batch: number, target_subject: number) {
   const query = new URLSearchParams({ target_batch: String(target_batch), target_subject: String(target_subject) });
   return apiFetch(`/attendance/window/?${query.toString()}`);

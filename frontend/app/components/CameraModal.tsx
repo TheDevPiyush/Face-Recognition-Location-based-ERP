@@ -1,7 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { X, Camera } from "lucide-react";
+import { Camera } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/app/components/ui/dialog";
+import { Button } from "@/app/components/ui/button";
+import { Spinner } from "@/app/components/ui/spinner";
 
 type CameraModalProps = {
   isOpen: boolean;
@@ -31,36 +34,100 @@ export default function CameraModal({ isOpen, onClose, onCapture, isUploading = 
   }, [isOpen]);
 
   useEffect(() => {
-    const video = videoRef.current;
-    if (!video || !isOpen) return;
+    if (!isOpen) return;
 
-    const handlePlaying = () => {
-      setIsCameraReady(true);
+    const video = videoRef.current;
+    if (!video) return;
+
+    // Function to check if video is actually playing
+    const checkVideoReady = () => {
+      if (!video || !streamRef.current) {
+        console.log("Check failed: no video or stream");
+        return false;
+      }
+      
+      // Check if video has valid dimensions (camera stream is active)
+      const hasValidDimensions = video.videoWidth > 0 && video.videoHeight > 0;
+      console.log("Video dimensions:", video.videoWidth, video.videoHeight);
+      
+      // Check if video is playing (not paused)
+      const isPlaying = !video.paused;
+      console.log("Video paused:", video.paused, "Playing:", isPlaying);
+      
+      // Check ready state
+      const isReady = video.readyState >= 2;
+      console.log("Video readyState:", video.readyState);
+      
+      const result = hasValidDimensions && isPlaying && isReady;
+      console.log("Video ready check result:", result);
+      return result;
     };
 
-    const handleLoadedMetadata = () => {
-      // Also check if video is ready
-      if (video.readyState >= 2) {
+    // Event handlers
+    const handlePlaying = () => {
+      console.log("Video playing event fired");
+      if (checkVideoReady()) {
         setIsCameraReady(true);
       }
     };
 
-    const handleError = () => {
+    const handleLoadedMetadata = () => {
+      console.log("Video metadata loaded");
+      if (video.paused) {
+        video.play().catch((err) => {
+          console.error("Error playing video:", err);
+        });
+      }
+    };
+
+    const handleCanPlay = () => {
+      console.log("Video can play event fired");
+      if (checkVideoReady()) {
+        setIsCameraReady(true);
+      }
+    };
+
+    const handleTimeUpdate = () => {
+      // This fires continuously when video is playing
+      if (checkVideoReady() && !isCameraReady) {
+        console.log("Video ready via timeupdate");
+        setIsCameraReady(true);
+      }
+    };
+
+    const handleError = (e: Event) => {
+      console.error("Video error:", e);
       setIsCameraReady(false);
     };
 
+    // Add event listeners
     video.addEventListener("playing", handlePlaying);
     video.addEventListener("loadedmetadata", handleLoadedMetadata);
+    video.addEventListener("canplay", handleCanPlay);
+    video.addEventListener("timeupdate", handleTimeUpdate);
     video.addEventListener("error", handleError);
 
-    // If video is already playing, set ready immediately
-    if (video.readyState >= 2) {
-      setIsCameraReady(true);
-    }
+    // Aggressive polling to check video state (for MediaStream, events might not fire reliably)
+    const checkInterval = setInterval(() => {
+      if (checkVideoReady()) {
+        console.log("Video ready via polling check");
+        setIsCameraReady(true);
+        clearInterval(checkInterval);
+      }
+    }, 50); // Check every 50ms for faster detection
+
+    // Cleanup after 10 seconds to prevent infinite checking
+    const timeoutId = setTimeout(() => {
+      clearInterval(checkInterval);
+    }, 10000);
 
     return () => {
+      clearInterval(checkInterval);
+      clearTimeout(timeoutId);
       video.removeEventListener("playing", handlePlaying);
       video.removeEventListener("loadedmetadata", handleLoadedMetadata);
+      video.removeEventListener("canplay", handleCanPlay);
+      video.removeEventListener("timeupdate", handleTimeUpdate);
       video.removeEventListener("error", handleError);
     };
   }, [isOpen]);
@@ -69,23 +136,55 @@ export default function CameraModal({ isOpen, onClose, onCapture, isUploading = 
     try {
       setError(null);
       setIsCameraReady(false);
+      
+      // Stop any existing stream first
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
+        streamRef.current = null;
+      }
+      
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: "user" },
         audio: false,
       });
       
       if (videoRef.current) {
-        videoRef.current.srcObject = stream;
         streamRef.current = stream;
+        videoRef.current.srcObject = stream;
         
-        // Wait for video to be ready
-        videoRef.current.onloadedmetadata = () => {
-          if (videoRef.current) {
-            videoRef.current.play().catch((err) => {
-              console.error("Error playing video:", err);
-            });
+        console.log("Stream set on video element");
+        
+        // For MediaStream, we need to explicitly play
+        // Use a small delay to ensure srcObject is processed
+        const playVideo = () => {
+          if (videoRef.current && streamRef.current) {
+            videoRef.current.play()
+              .then(() => {
+                console.log("Video play() promise resolved");
+                // Set ready state after a small delay to allow video to actually start
+                setTimeout(() => {
+                  if (videoRef.current && 
+                      videoRef.current.videoWidth > 0 && 
+                      videoRef.current.videoHeight > 0 &&
+                      !videoRef.current.paused) {
+                    console.log("Video confirmed ready after play()");
+                    setIsCameraReady(true);
+                  }
+                }, 100);
+              })
+              .catch((err) => {
+                console.error("Error playing video:", err);
+                setError("Failed to start video playback");
+              });
           }
         };
+        
+        // Try immediately
+        playVideo();
+        
+        // Also try after a short delay in case it needs time
+        setTimeout(playVideo, 50);
+        setTimeout(playVideo, 200);
       }
     } catch (err: any) {
       setError(err.message || "Failed to access camera");
@@ -137,23 +236,12 @@ export default function CameraModal({ isOpen, onClose, onCapture, isUploading = 
     );
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
-      <div className="relative w-full max-w-2xl mx-4 bg-white rounded-3xl shadow-2xl overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center justify-between p-4 bg-gradient-to-r from-primary/10 to-accent/10">
-          <h2 className="text-xl font-semibold text-foreground">Take your photo for attendance</h2>
-          <button
-            onClick={onClose}
-            disabled={isUploading}
-            className="p-2 rounded-full hover:bg-black/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            aria-label="Close"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-2xl w-full mx-4 p-0 overflow-hidden">
+        <DialogHeader className="p-4 bg-gradient-to-r from-primary/10 to-accent/10">
+          <DialogTitle>Take your photo for attendance</DialogTitle>
+        </DialogHeader>
 
         {/* Camera View */}
         <div className="relative bg-black">
@@ -169,7 +257,7 @@ export default function CameraModal({ isOpen, onClose, onCapture, isUploading = 
           {error && (
             <div className="absolute inset-0 flex items-center justify-center bg-black/80">
               <div className="text-center p-6">
-                <p className="text-red-400 text-lg font-semibold mb-2">⚠️ Camera Error</p>
+                <p className="text-red-400 text-lg font-semibold mb-2">Camera Error</p>
                 <p className="text-white/80">{error}</p>
                 <button
                   onClick={startCamera}
@@ -184,7 +272,7 @@ export default function CameraModal({ isOpen, onClose, onCapture, isUploading = 
           {!error && !isCameraReady && (
             <div className="absolute inset-0 flex items-center justify-center bg-black/80">
               <div className="text-center">
-                <div className="animate-spin border-4 border-white/30 border-t-white rounded-full w-12 h-12 mx-auto mb-4"></div>
+                <Spinner size="lg" className="border-white/30 border-t-white mx-auto mb-4" />
                 <p className="text-white/80">Starting camera...</p>
               </div>
             </div>
@@ -192,39 +280,38 @@ export default function CameraModal({ isOpen, onClose, onCapture, isUploading = 
         </div>
 
         {/* Controls */}
-        <div className="p-6 bg-white">
+        <div className="p-6 bg-background space-y-4">
           <div className="flex items-center justify-center gap-4">
-            <button
+            <Button
+              variant="outline"
               onClick={onClose}
               disabled={isUploading}
-              className="px-6 py-3 rounded-xl border-2 border-gray-300 text-foreground hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
             >
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={capturePhoto}
               disabled={isUploading || !isCameraReady || !!error}
-              className="px-6 py-3 rounded-xl bg-primary text-white hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium flex items-center gap-2"
             >
               {isUploading ? (
                 <>
-                  <div className="animate-spin border-2 border-white/30 border-t-white rounded-full w-5 h-5"></div>
+                  <Spinner size="sm" className="mr-2 border-white/30 border-t-white" />
                   Uploading...
                 </>
               ) : (
                 <>
-                  <Camera className="h-5 w-5" />
+                  <Camera className="h-5 w-5 mr-2" />
                   Capture & Submit
                 </>
               )}
-            </button>
+            </Button>
           </div>
-          <p className="text-center text-sm text-gray-500 mt-4">
+          <p className="text-center text-sm text-muted-foreground">
             Make sure your face is clearly visible in the frame
           </p>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 

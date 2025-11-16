@@ -61,9 +61,10 @@ class UserView(APIView):
 class UserStudentView(APIView):
     permission_classes = [IsAuthenticated]
 
-    def get(self, request):
+    def get(self, request, batch_id):
         """Get all students"""
-        students = User.objects.filter(role=User.Role.STUDENT)
+        get_object_or_404(Batch, id=batch_id)
+        students = User.objects.filter(role=User.Role.STUDENT, batch=batch_id)
         serializer = UserStudentSerializer(students, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 

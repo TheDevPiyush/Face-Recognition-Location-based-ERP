@@ -1,5 +1,3 @@
-import re
-import stat
 from pgvector.django import L2Distance
 from rest_framework.views import APIView
 from rest_framework.response import Response

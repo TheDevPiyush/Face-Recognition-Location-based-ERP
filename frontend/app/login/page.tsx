@@ -1,7 +1,13 @@
 "use client";
 
 import { login, fetchMe, setCurrentUser } from "@/lib/api";
-import Alert from "@/app/components/Alert";
+import { Alert, AlertDescription } from "@/app/components/ui/alert";
+import { Button } from "@/app/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/app/components/ui/card";
+import { Input } from "@/app/components/ui/input";
+import { Label } from "@/app/components/ui/label";
+import { Badge } from "@/app/components/ui/badge";
+import { Spinner } from "@/app/components/ui/spinner";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -30,24 +36,21 @@ export default function LoginPage() {
 
   return (
     <div className="mx-auto flex min-h-[70vh] w-full max-w-lg flex-col items-center justify-center text-center">
-      <div className="card-soft relative w-full overflow-hidden p-10">
-        <div className="pointer-events-none absolute -top-20 right-[-60px] h-56 w-56 rounded-full bg-primary/15 blur-3xl" />
-        <div className="pointer-events-none absolute -bottom-24 left-[-60px] h-56 w-56 rounded-full bg-accent/15 blur-3xl" />
-        <div className="relative space-y-8">
-          <div className="space-y-3">
-            <span className="badge bg-primary/20 text-primary">Welcome back</span>
-            <h1 className="section-title text-4xl">Sign in to your cozy campus hub</h1>
-            <p className="section-subtitle">
-              Manage attendance, subjects, and your student life with a sprinkle of pastel magic ✨
-            </p>
-          </div>
-
+      <Card className="w-full">
+        <CardHeader className="space-y-3">
+          <Badge variant="secondary">Welcome</Badge>
+          <CardTitle className="text-4xl">Sign In</CardTitle>
+          <CardDescription>
+            Sign in to manage your attendance, subjects, and academic information.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
           <form onSubmit={onSubmit} className="space-y-5 text-left">
-            <div className="space-y-3">
-              <div>
-                <label className="mb-2 block">Email</label>
-                <input
-                  className="input"
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -56,10 +59,10 @@ export default function LoginPage() {
                   autoComplete="email"
                 />
               </div>
-              <div>
-                <label className="mb-2 block">Password</label>
-                <input
-                  className="input"
+              <div className="space-y-2">
+                <Label htmlFor="password">Password</Label>
+                <Input
+                  id="password"
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -70,14 +73,25 @@ export default function LoginPage() {
               </div>
             </div>
 
-            {error ? <Alert type="error">{error}</Alert> : null}
+            {error ? (
+              <Alert variant="destructive">
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            ) : null}
 
-            <button className="btn mt-6 w-full" disabled={loading} type="submit">
-              {loading ? "Signing in..." : "Enter the portal"}
-            </button>
+            <Button className="mt-6 w-full" disabled={loading} type="submit">
+              {loading ? (
+                <>
+                  <Spinner size="sm" className="mr-2" />
+                  Signing in...
+                </>
+              ) : (
+                "Enter the portal"
+              )}
+            </Button>
           </form>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
