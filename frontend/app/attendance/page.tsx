@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { fetchMe, fetchSubjects, getWindow, markAttendance, updateMyLocation } from "@/lib/api";
 import { Alert, AlertDescription } from "@/app/components/ui/alert";
 import { useToast } from "@/app/components/ui/use-toast";
@@ -97,6 +97,16 @@ export default function AttendancePage() {
     }
   };
 
+  const refreshWindowStatus = useCallback(async () => {
+    if (!myBatchId || !subjectId) return;
+    try {
+      const latest = await getWindow(myBatchId, subjectId);
+      setWindowInfo(latest);
+    } catch {
+      setWindowInfo(null);
+    }
+  }, [myBatchId, subjectId]);
+
   const markMe = async () => {
     if (!windowInfo?.id) return;
     setIsCameraModalOpen(true);
@@ -122,6 +132,20 @@ export default function AttendancePage() {
     }, 1000);
     return () => clearInterval(timer);
   }, [windowInfo?.id, windowInfo?.is_active, windowInfo?.duration, windowInfo?.start_time]);
+
+  const countdownRefreshTriggered = useRef(false);
+  useEffect(() => {
+    if (!windowInfo?.is_active) {
+      countdownRefreshTriggered.current = false;
+      return;
+    }
+    if (remainingSec === 0 && !countdownRefreshTriggered.current) {
+      countdownRefreshTriggered.current = true;
+      refreshWindowStatus();
+    } else if (remainingSec > 0) {
+      countdownRefreshTriggered.current = false;
+    }
+  }, [remainingSec, windowInfo?.is_active, refreshWindowStatus]);
 
   const formatMMSS = (total: number) => {
     const m = Math.floor(total / 60);

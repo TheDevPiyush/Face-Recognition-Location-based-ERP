@@ -13,6 +13,8 @@ from services.face_recognition import has_face
 from ..models import Batch, Subject, Attendance_Window, User, Attendance_Record
 from ..serializers import Attendance_WindowSerializer, AttendanceRecordSerializer
 
+FACE_MATCH_THRESHOLD = 0.8
+
 
 class AttendanceWindowView(APIView):
 
@@ -153,6 +155,28 @@ class AttendanceRecordView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        window = get_object_or_404(Attendance_Window, pk=window_id)
+
+        
+        # Check active window
+        if not window.is_active:
+            return Response(
+                {"message": "Attendance window is not active"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Check time validity
+        now = timezone.now()
+        window_end = window.start_time + timedelta(seconds=int(window.duration))
+        if now > window_end:
+            Attendance_Window.objects.filter(id=window.id).update(
+                is_active=False
+            )
+            return Response(
+                {"message": "Attendance window is closed"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         has_face_flag, encoding = has_face(image_file=image)
 
         if not has_face_flag:
@@ -167,6 +191,8 @@ class AttendanceRecordView(APIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
+        encoding_vector = encoding.tolist() if hasattr(encoding, "tolist") else encoding
+
         # role-based access control
         if allowed := check_allow_roles(
             request.user, [User.Role.TEACHER, User.Role.ADMIN, User.Role.STUDENT]
@@ -174,7 +200,7 @@ class AttendanceRecordView(APIView):
             return allowed
 
         user_data = (
-            User.objects.annotate(distance=L2Distance("face_embedding", encoding))
+            User.objects.annotate(distance=L2Distance("face_embedding", encoding_vector))
             .order_by("distance")
             .first()
         )
@@ -188,10 +214,10 @@ class AttendanceRecordView(APIView):
                 },
                 status=status.HTTP_404_NOT_FOUND,
             )
-
-        if user_data and user_data.distance > 0.55:
+        print(user_data)
+        if user_data and user_data.distance > FACE_MATCH_THRESHOLD:
             return Response(
-                {"error": "Face did not match!"},
+                {"error": "Face did not match! Make sure you are not wearing glasses and you are close to the camera!"},
                 status=status.HTTP_403_FORBIDDEN,
             )
 
@@ -205,7 +231,6 @@ class AttendanceRecordView(APIView):
                 )
             target_user = get_object_or_404(User, pk=user_data)
 
-        window = get_object_or_404(Attendance_Window, pk=window_id)
 
         # Students can only mark their own attendance
         if request.user.role == User.Role.STUDENT and request.user.id != target_user.id:
@@ -221,26 +246,7 @@ class AttendanceRecordView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Check active window
-        if not window.is_active:
-            return Response(
-                {"message": "Attendance window is not active"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
         today = timezone.localdate()
-
-        # Check time validity
-        now = timezone.now()
-        window_end = window.start_time + timedelta(seconds=int(window.duration))
-        if now > window_end:
-            close_window = Attendance_Window.objects.filter(id=window.id).update(
-                is_active=False
-            )
-            return Response(
-                {"message": "Attendance window is closed"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
 
         # Location check
         if target_user.latitude is None or target_user.longitude is None:
