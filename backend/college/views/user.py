@@ -142,7 +142,10 @@ class CurrentUserView(APIView):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
             try:
-                user.face_embedding = encoding
+                embedding_vector = (
+                    encoding.tolist() if hasattr(encoding, "tolist") else encoding
+                )
+                user.face_embedding = embedding_vector
                 user.save(update_fields=["face_embedding"])
                 uploaded_url = upload_to_supabase(image_file=image_file)
             except Exception as e:

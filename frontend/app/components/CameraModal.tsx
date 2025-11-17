@@ -5,6 +5,13 @@ import { Camera } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/app/components/ui/dialog";
 import { Button } from "@/app/components/ui/button";
 import { Spinner } from "@/app/components/ui/spinner";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/app/components/ui/select";
 
 type CameraModalProps = {
   isOpen: boolean;
@@ -17,19 +24,46 @@ export default function CameraModal({ isOpen, onClose, onCapture, isUploading = 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const startRequestRef = useRef(0);
   const [error, setError] = useState<string | null>(null);
   const [isCameraReady, setIsCameraReady] = useState(false);
+  const [availableCameras, setAvailableCameras] = useState<MediaDeviceInfo[]>([]);
+  const [selectedCameraId, setSelectedCameraId] = useState<string | undefined>(undefined);
+  const [isEnumerating, setIsEnumerating] = useState(false);
+  const [capturedPreview, setCapturedPreview] = useState<string | null>(null);
 
   useEffect(() => {
-    if (isOpen) {
-      setIsCameraReady(false);
-      startCamera();
-    } else {
+    if (!isOpen) {
       stopCamera();
+      setCapturedPreview(null);
+      return;
     }
+
+    if (capturedPreview) {
+      stopCamera();
+      return;
+    }
+
+    setIsCameraReady(false);
+    startCamera(selectedCameraId);
 
     return () => {
       stopCamera();
+    };
+  }, [isOpen, selectedCameraId, capturedPreview]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleDeviceChange = () => {
+      refreshCameras();
+    };
+
+    navigator.mediaDevices?.addEventListener("devicechange", handleDeviceChange);
+    refreshCameras();
+
+    return () => {
+      navigator.mediaDevices?.removeEventListener("devicechange", handleDeviceChange);
     };
   }, [isOpen]);
 
@@ -132,7 +166,26 @@ export default function CameraModal({ isOpen, onClose, onCapture, isUploading = 
     };
   }, [isOpen]);
 
-  const startCamera = async () => {
+  const refreshCameras = async () => {
+    if (!navigator.mediaDevices?.enumerateDevices) return;
+    setIsEnumerating(true);
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const videoDevices = devices.filter((device) => device.kind === "videoinput");
+      setAvailableCameras(videoDevices);
+
+      if (!selectedCameraId && videoDevices.length > 0) {
+        setSelectedCameraId(videoDevices[0].deviceId);
+      }
+    } catch (err) {
+      console.error("Error enumerating devices", err);
+    } finally {
+      setIsEnumerating(false);
+    }
+  };
+
+  const startCamera = async (deviceId?: string) => {
+    const requestId = ++startRequestRef.current;
     try {
       setError(null);
       setIsCameraReady(false);
@@ -143,10 +196,19 @@ export default function CameraModal({ isOpen, onClose, onCapture, isUploading = 
         streamRef.current = null;
       }
       
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "user" },
+      const constraints: MediaStreamConstraints = {
+        video: deviceId
+          ? { deviceId: { exact: deviceId } }
+          : { facingMode: "user" },
         audio: false,
-      });
+      };
+
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+
+      if (requestId !== startRequestRef.current) {
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
       
       if (videoRef.current) {
         streamRef.current = stream;
@@ -154,39 +216,37 @@ export default function CameraModal({ isOpen, onClose, onCapture, isUploading = 
         
         console.log("Stream set on video element");
         
-        // For MediaStream, we need to explicitly play
-        // Use a small delay to ensure srcObject is processed
-        const playVideo = () => {
-          if (videoRef.current && streamRef.current) {
-            videoRef.current.play()
-              .then(() => {
-                console.log("Video play() promise resolved");
-                // Set ready state after a small delay to allow video to actually start
-                setTimeout(() => {
-                  if (videoRef.current && 
-                      videoRef.current.videoWidth > 0 && 
-                      videoRef.current.videoHeight > 0 &&
-                      !videoRef.current.paused) {
-                    console.log("Video confirmed ready after play()");
-                    setIsCameraReady(true);
-                  }
-                }, 100);
-              })
-              .catch((err) => {
-                console.error("Error playing video:", err);
-                setError("Failed to start video playback");
-              });
+        try {
+          await videoRef.current.play();
+          if (
+            videoRef.current.videoWidth > 0 &&
+            videoRef.current.videoHeight > 0 &&
+            !videoRef.current.paused
+          ) {
+            setIsCameraReady(true);
+          } else {
+            setTimeout(() => {
+              if (
+                videoRef.current &&
+                videoRef.current.videoWidth > 0 &&
+                videoRef.current.videoHeight > 0 &&
+                !videoRef.current.paused
+              ) {
+                setIsCameraReady(true);
+              }
+            }, 150);
           }
-        };
-        
-        // Try immediately
-        playVideo();
-        
-        // Also try after a short delay in case it needs time
-        setTimeout(playVideo, 50);
-        setTimeout(playVideo, 200);
+        } catch (err) {
+          console.error("Error playing video:", err);
+          setError("Failed to start video playback");
+        }
       }
+
+      await refreshCameras();
     } catch (err: any) {
+      if (requestId !== startRequestRef.current) {
+        return;
+      }
       setError(err.message || "Failed to access camera");
       console.error("Camera error:", err);
       setIsCameraReady(false);
@@ -194,6 +254,7 @@ export default function CameraModal({ isOpen, onClose, onCapture, isUploading = 
   };
 
   const stopCamera = () => {
+    startRequestRef.current += 1;
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((track) => track.stop());
       streamRef.current = null;
@@ -220,6 +281,10 @@ export default function CameraModal({ isOpen, onClose, onCapture, isUploading = 
     // Draw the current video frame to canvas
     context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
+    const previewUrl = canvas.toDataURL("image/jpeg", 0.95);
+    setCapturedPreview(previewUrl);
+    stopCamera();
+
     // Convert canvas to blob, then to File
     canvas.toBlob(
       (blob) => {
@@ -236,23 +301,58 @@ export default function CameraModal({ isOpen, onClose, onCapture, isUploading = 
     );
   };
 
+  const handleClose = (open: boolean) => {
+    if (!open) {
+      if (isUploading) return;
+      onClose();
+    }
+  };
+
+  const handleRetake = () => {
+    if (isUploading) return;
+    setCapturedPreview(null);
+    setTimeout(() => startCamera(selectedCameraId), 0);
+  };
+
+  const cameraDisabled = isUploading || !!error;
+
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl w-full mx-4 p-0 overflow-hidden">
-        <DialogHeader className="p-4 bg-gradient-to-r from-primary/10 to-accent/10">
-          <DialogTitle>Take your photo for attendance</DialogTitle>
+    <Dialog open={isOpen} onOpenChange={handleClose}>
+      <DialogContent className="max-w-3xl w-full mx-4 p-0 overflow-hidden border border-border/50 bg-background/95 backdrop-blur">
+        <DialogHeader className="p-6 pb-4 bg-linear-to-r from-primary/10 via-primary/5 to-transparent">
+          <DialogTitle className="text-xl font-semibold">
+            Capture your attendance photo
+          </DialogTitle>
+          <p className="text-sm text-muted-foreground">
+            Ensure you have good lighting, remove face coverings, and center yourself in the frame.
+          </p>
         </DialogHeader>
 
-        {/* Camera View */}
-        <div className="relative bg-black">
-          <video
-            ref={videoRef}
-            autoPlay
-            playsInline
-            muted
-            className="w-full h-auto max-h-[70vh] object-contain"
-          />
+        {/* Camera / Preview */}
+        <div className="relative bg-black min-h-[320px]">
+          {!capturedPreview && (
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
+              className="w-full h-auto max-h-[70vh] object-contain"
+            />
+          )}
           <canvas ref={canvasRef} className="hidden" />
+
+          {capturedPreview && (
+            <div className="relative flex items-center justify-center bg-black">
+              <img
+                src={capturedPreview}
+                alt="Captured preview"
+                className="max-h-[70vh] w-full object-contain"
+              />
+              <div className="absolute top-4 right-4 rounded-full bg-black/70 px-3 py-1 text-xs uppercase tracking-wider text-white/80">
+                Preview
+              </div>
+            </div>
+          )}
 
           {error && (
             <div className="absolute inset-0 flex items-center justify-center bg-black/80">
@@ -260,7 +360,7 @@ export default function CameraModal({ isOpen, onClose, onCapture, isUploading = 
                 <p className="text-red-400 text-lg font-semibold mb-2">Camera Error</p>
                 <p className="text-white/80">{error}</p>
                 <button
-                  onClick={startCamera}
+                  onClick={() => startCamera(selectedCameraId)}
                   className="mt-4 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
                 >
                   Try Again
@@ -269,7 +369,7 @@ export default function CameraModal({ isOpen, onClose, onCapture, isUploading = 
             </div>
           )}
 
-          {!error && !isCameraReady && (
+          {!error && !isCameraReady && !capturedPreview && (
             <div className="absolute inset-0 flex items-center justify-center bg-black/80">
               <div className="text-center">
                 <Spinner size="lg" className="border-white/30 border-t-white mx-auto mb-4" />
@@ -277,38 +377,91 @@ export default function CameraModal({ isOpen, onClose, onCapture, isUploading = 
               </div>
             </div>
           )}
+
+          {isUploading && (
+            <div className="absolute inset-x-0 bottom-0 bg-black/70 backdrop-blur py-3 px-4 flex items-center justify-center gap-3 text-white text-sm">
+              <Spinner size="sm" className="border-white/30 border-t-white" />
+              Uploading photo. Please keep this window open.
+            </div>
+          )}
         </div>
 
         {/* Controls */}
-        <div className="p-6 bg-background space-y-4">
-          <div className="flex items-center justify-center gap-4">
+        <div className="p-6 bg-background space-y-5">
+          <div>
+            <p className="text-sm font-medium mb-2">Camera source</p>
+            {availableCameras.length ? (
+              <Select
+                value={selectedCameraId ?? undefined}
+                onValueChange={(value) => {
+                  setSelectedCameraId(value);
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue
+                    placeholder={
+                      isEnumerating ? "Scanning cameras..." : "Choose a camera"
+                    }
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableCameras.map((device, index) => (
+                    <SelectItem key={device.deviceId || index} value={device.deviceId}>
+                      {device.label || `Camera ${index + 1}`}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <div className="text-sm text-muted-foreground">
+                {isEnumerating
+                  ? "Searching for available cameras..."
+                  : "No cameras detected"}
+              </div>
+            )}
+          </div>
+
+          <div className="flex flex-wrap items-center justify-center gap-3">
             <Button
               variant="outline"
-              onClick={onClose}
+              onClick={() => handleClose(false)}
               disabled={isUploading}
             >
               Cancel
             </Button>
-            <Button
-              onClick={capturePhoto}
-              disabled={isUploading || !isCameraReady || !!error}
-            >
-              {isUploading ? (
-                <>
-                  <Spinner size="sm" className="mr-2 border-white/30 border-t-white" />
-                  Uploading...
-                </>
-              ) : (
-                <>
-                  <Camera className="h-5 w-5 mr-2" />
-                  Capture & Submit
-                </>
-              )}
-            </Button>
+
+            {!capturedPreview ? (
+              <Button
+                onClick={capturePhoto}
+                disabled={cameraDisabled || !isCameraReady}
+                className="gap-2"
+              >
+                <Camera className="h-5 w-5" />
+                Capture photo
+              </Button>
+            ) : (
+              <div className="flex items-center gap-3">
+                <Button
+                  variant="secondary"
+                  onClick={handleRetake}
+                  disabled={isUploading}
+                >
+                  Retake
+                </Button>
+                <Button disabled className="gap-2">
+                  <Spinner size="sm" className="border-white/30 border-t-white" />
+                  {isUploading ? "Uploading..." : "Processing..."}
+                </Button>
+              </div>
+            )}
           </div>
-          <p className="text-center text-sm text-muted-foreground">
-            Make sure your face is clearly visible in the frame
-          </p>
+
+          <div className="text-center text-sm text-muted-foreground space-y-1">
+            <p>Avoid strong backlight and keep your face clearly visible.</p>
+            {capturedPreview && !isUploading && (
+              <p className="text-green-600 dark:text-green-400">Photo captured. Uploading now...</p>
+            )}
+          </div>
         </div>
       </DialogContent>
     </Dialog>

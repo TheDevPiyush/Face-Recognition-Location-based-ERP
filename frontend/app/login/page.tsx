@@ -38,7 +38,6 @@ export default function LoginPage() {
     <div className="mx-auto flex min-h-[70vh] w-full max-w-lg flex-col items-center justify-center text-center">
       <Card className="w-full">
         <CardHeader className="space-y-3">
-          <Badge variant="secondary">Welcome</Badge>
           <CardTitle className="text-4xl">Sign In</CardTitle>
           <CardDescription>
             Sign in to manage your attendance, subjects, and academic information.

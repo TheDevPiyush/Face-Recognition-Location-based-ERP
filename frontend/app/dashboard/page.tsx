@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   fetchMe,
   fetchBatches,
@@ -208,6 +208,7 @@ function TeacherPanel({ subjects, batches }: { subjects: Subject[]; batches: Bat
   const [studentsInBatch, setStudentsInBatch] = useState<Student[]>([]);
   const [studentLoading, setStudentLoading] = useState(false)
   const [remainingSec, setRemainingSec] = useState<number>(0);
+  const countdownRefreshTriggered = useRef(false);
   const { toast } = useToast();
   const addToast = (description: string, type: "success" | "error" | "info" = "success") => {
     toast({
@@ -251,6 +252,19 @@ function TeacherPanel({ subjects, batches }: { subjects: Subject[]; batches: Bat
     }, 1000);
     return () => clearInterval(timer);
   }, [windowInfo?.id, windowInfo?.is_active, windowInfo?.duration, windowInfo?.start_time]);
+
+  useEffect(() => {
+    if (!windowInfo?.is_active) {
+      countdownRefreshTriggered.current = false;
+      return;
+    }
+    if (remainingSec === 0 && !countdownRefreshTriggered.current) {
+      countdownRefreshTriggered.current = true;
+      refreshWindow(batchId, subjectId);
+    } else if (remainingSec > 0) {
+      countdownRefreshTriggered.current = false;
+    }
+  }, [remainingSec, windowInfo?.is_active, batchId, subjectId]);
 
   const formatMMSS = (total: number) => {
     const m = Math.floor(total / 60);
