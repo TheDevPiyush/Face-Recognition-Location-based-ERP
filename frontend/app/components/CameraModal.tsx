@@ -405,11 +405,13 @@ export default function CameraModal({ isOpen, onClose, onCapture, isUploading = 
                   />
                 </SelectTrigger>
                 <SelectContent>
-                  {availableCameras.map((device, index) => (
-                    <SelectItem key={device.deviceId || index} value={device.deviceId}>
-                      {device.label || `Camera ${index + 1}`}
-                    </SelectItem>
-                  ))}
+                  {availableCameras
+                    .filter((device) => device.deviceId)
+                    .map((device, index) => (
+                      <SelectItem key={device.deviceId} value={device.deviceId}>
+                        {device.label || `Camera ${index + 1}`}
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             ) : (
