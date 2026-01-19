@@ -16,23 +16,23 @@ if __name__ == "__main__":
     root = os.getcwd()
 
     print("🚀 Starting Django on port 8080...")
-    django = run_process("python manage.py runserver 8080", cwd=root)
+    django = run_process("sudo python3 manage.py runserver 8080", cwd=root)
 
     print("🚀 Starting Frontend (npm run dev)...")
-    frontend = run_process("npm run dev", cwd=os.path.join(root, "frontend"))
+    frontend = run_process("sudo npm run dev", cwd=os.path.join(root.replace("backend", "frontend")))
 
-    print("🚀 Starting Cloudflared tunnel...")
-    tunnel = run_process("cloudflared tunnel run localhosts")
+    # print("🚀 Starting Cloudflared tunnel...")
+    # tunnel = run_process("cloudflared tunnel run localhosts")
 
     print("\n✨ All servers started. Press CTRL + C to stop everything.\n")
 
     try:
         django.wait()
         frontend.wait()
-        tunnel.wait()
+        # tunnel.wait()
     except KeyboardInterrupt:
         print("\n🛑 Stopping all processes...")
         django.terminate()
         frontend.terminate()
-        tunnel.terminate()
+        # tunnel.terminate()
         sys.exit(0)

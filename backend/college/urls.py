@@ -6,6 +6,7 @@ from .views.course import CourseListCreateView, CourseDetailView
 from .views.batch import BatchListCreateView, BatchDetailView
 from .views.subject import SubjectListCreateView, SubjectDetailView
 from .views.attendance import AttendanceWindowView, AttendanceRecordView
+from .views.analytics import AttendanceAnalyticsView, AttendanceMonthlyPercentageView, StudentCalendarView
 
 urlpatterns = [
     #
@@ -40,6 +41,15 @@ urlpatterns = [
     ),
     path(
         "attendance/record/", AttendanceRecordView.as_view(), name="attendance-record"
+    ),
+    path(
+        "attendance/analytics/", AttendanceAnalyticsView.as_view(), name="attendance-analytics"
+    ),
+    path(
+        "attendance/monthly-percentage/", AttendanceMonthlyPercentageView.as_view(), name="attendance-monthly-percentage"
+    ),
+    path(
+        "attendance/student-calendar/", StudentCalendarView.as_view(), name="student-calendar"
     ),
     #
     #

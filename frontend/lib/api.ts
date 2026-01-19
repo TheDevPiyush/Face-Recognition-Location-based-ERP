@@ -363,3 +363,49 @@ export async function createMultipleUsers(
   });
 }
 
+// Attendance Analytics
+export async function fetchAttendanceAnalytics(params: {
+  batch_id?: number;
+  subject_id?: number;
+  student_id?: number;
+  start_date?: string;
+  end_date?: string;
+  month?: string;
+}) {
+  const query = new URLSearchParams();
+  if (params.batch_id) query.append("batch_id", String(params.batch_id));
+  if (params.subject_id) query.append("subject_id", String(params.subject_id));
+  if (params.student_id) query.append("student_id", String(params.student_id));
+  if (params.start_date) query.append("start_date", params.start_date);
+  if (params.end_date) query.append("end_date", params.end_date);
+  if (params.month) query.append("month", params.month);
+  
+  return apiFetch(`/attendance/analytics/?${query.toString()}`);
+}
+
+export async function fetchMonthlyPercentage(params: {
+  batch_id?: number;
+  subject_id?: number;
+  student_id?: number;
+  month?: string;
+}) {
+  const query = new URLSearchParams();
+  if (params.batch_id) query.append("batch_id", String(params.batch_id));
+  if (params.subject_id) query.append("subject_id", String(params.subject_id));
+  if (params.student_id) query.append("student_id", String(params.student_id));
+  if (params.month) query.append("month", params.month);
+  
+  return apiFetch(`/attendance/monthly-percentage/?${query.toString()}`);
+}
+
+export async function fetchStudentCalendar(params: {
+  month?: string;
+  batch_id?: number;
+}) {
+  const query = new URLSearchParams();
+  if (params.month) query.append("month", params.month);
+  if (params.batch_id) query.append("batch_id", String(params.batch_id));
+  
+  return apiFetch(`/attendance/student-calendar/?${query.toString()}`);
+}
+

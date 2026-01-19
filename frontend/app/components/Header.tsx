@@ -44,6 +44,7 @@ export default function Header() {
     { href: "/dashboard", label: "Dashboard" },
     { href: "/subjects", label: "Subjects" },
     { href: "/attendance", label: "Attendance" },
+    { href: "/analytics", label: "Analytics" },
     { href: "/profile", label: "Profile" },
   ];
   const adminNav = [{ href: "/manage", label: "Manage" }];
