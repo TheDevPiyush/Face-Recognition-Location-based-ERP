@@ -134,9 +134,11 @@ class AttendanceAnalyticsView(APIView):
             classes_by_date[date_key] += 1
 
         # Daily attendance breakdown
+        # Use window date (class date) not record.date so present/absent align with total_classes.
         daily_data = {}
         for record in records:
-            date_key = record.date.isoformat()
+            window_date = record.attendance_window.start_time.date()
+            date_key = window_date.isoformat()
             if date_key not in daily_data:
                 daily_data[date_key] = {
                     "date": date_key,
@@ -144,7 +146,6 @@ class AttendanceAnalyticsView(APIView):
                     "absent": 0,
                     "total_classes": classes_by_date.get(date_key, 0),
                 }
-            
             if record.status == Attendance_Record.Status.PRESENT:
                 daily_data[date_key]["present"] += 1
             elif record.status == Attendance_Record.Status.ABSENT:
@@ -213,15 +214,20 @@ class AttendanceAnalyticsView(APIView):
                 absent_count = total_classes - present_count
                 
                 if total_classes > 0:
-                    percentage = round((present_count / total_classes) * 100, 2)
+                    raw = (present_count / total_classes) * 100
+                    percentage = round(min(100.0, raw), 2)
+                    present_capped = min(present_count, total_classes)
+                    absent_capped = total_classes - present_capped
                 else:
                     percentage = 0.0
+                    present_capped = 0
+                    absent_capped = 0
 
                 monthly_percentage = {
                     "month": month_str,
                     "total_classes": total_classes,
-                    "present_count": present_count,
-                    "absent_count": absent_count,
+                    "present_count": present_capped,
+                    "absent_count": absent_capped,
                     "percentage": percentage,
                 }
             except ValueError:
@@ -237,7 +243,8 @@ class AttendanceAnalyticsView(APIView):
         total_days_with_classes = len([d for d in daily_attendance if d["total_classes"] > 0])
         overall_percentage = 0.0
         if total_classes > 0:
-            overall_percentage = round((total_present / total_classes) * 100, 2)
+            raw = (total_present / total_classes) * 100
+            overall_percentage = round(min(100.0, raw), 2)
 
         return Response({
             "daily_attendance": daily_attendance,
@@ -502,7 +509,7 @@ class StudentCalendarView(APIView):
             start_time__date__lte=month_end
         ).select_related("target_subject")
 
-        window_ids = windows.values_list("id", flat=True)
+        window_ids = list(windows.values_list("id", flat=True))
         records = Attendance_Record.objects.filter(
             user_id=user.id,
             attendance_window_id__in=window_ids,
@@ -510,12 +517,26 @@ class StudentCalendarView(APIView):
             date__lte=month_end
         ).select_related("attendance_window__target_subject")
 
+        # Class dates = union of (1) window dates and (2) record dates.
+        # Same window can be reused across days; record.date is when the student marked.
+        class_dates = set()  # (subject_id, date_key)
+        for w in windows:
+            d = w.start_time.date().isoformat()
+            class_dates.add((w.target_subject.id, d))
+        for r in records:
+            sid = r.attendance_window.target_subject.id
+            d = r.date.isoformat()
+            class_dates.add((sid, d))
+
+        # Key by (subject, record.date): student's attendance per class date.
+        # Prefer P over A when multiple records exist for same (subject, date).
         record_map = {}
         for record in records:
             subject_id = record.attendance_window.target_subject.id
             date_key = record.date.isoformat()
-            attendance_status = "P" if record.status == Attendance_Record.Status.PRESENT else "A"
-            record_map[(subject_id, date_key)] = attendance_status
+            att = "P" if record.status == Attendance_Record.Status.PRESENT else "A"
+            if record_map.get((subject_id, date_key)) != "P":
+                record_map[(subject_id, date_key)] = att
 
         calendar_data = []
         days_in_month = calendar.monthrange(month_date.year, month_date.month)[1]
@@ -530,23 +551,18 @@ class StudentCalendarView(APIView):
                 "dates": {},
             }
 
-            # Initialize all dates as empty
             for day in range(1, days_in_month + 1):
                 date_obj = month_date.replace(day=day)
                 date_key = date_obj.isoformat()
-                subject_row["dates"][date_key] = None  # No class by default
+                subject_row["dates"][date_key] = "NA"  # No class by default
 
-            # Mark classes that happened (windows)
-            for window in windows:
-                if window.target_subject.id == subject.id:
-                    window_date = window.start_time.date()
-                    date_key = window_date.isoformat()
-                    # Check if student has a record
-                    if (subject.id, date_key) in record_map:
-                        subject_row["dates"][date_key] = record_map[(subject.id, date_key)]
-                    else:
-                        # Class happened but no record = Absent
-                        subject_row["dates"][date_key] = "A"
+            for (sid, date_key) in class_dates:
+                if sid != subject.id:
+                    continue
+                if (subject.id, date_key) in record_map:
+                    subject_row["dates"][date_key] = record_map[(subject.id, date_key)]
+                else:
+                    subject_row["dates"][date_key] = "A"  # Class happened, no record = absent
 
             calendar_data.append(subject_row)
 

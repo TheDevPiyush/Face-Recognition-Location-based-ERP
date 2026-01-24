@@ -46,7 +46,11 @@ class AttendanceWindowView(APIView):
             )
 
         window = (
-            Attendance_Window.objects.filter(target_batch=batch, target_subject=subject)
+            Attendance_Window.objects.filter(
+                target_batch=batch,
+                target_subject=subject,
+                is_active=True,
+            )
             .order_by("-id")
             .first()
         )
@@ -71,14 +75,12 @@ class AttendanceWindowView(APIView):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def post(self, request):
-        """Create or update (upsert) attendance window for batch+subject.
+        """Create or close an attendance window for batch+subject.
 
-        Body fields:
-        - batch: int (required)
-        - subject: int (required, must belong to batch)
-        - start_time: "HH:MM[:SS]" (required)
-        - end_time: "HH:MM[:SS]" (required)
-        - is_active: bool (optional)
+        - Open: is_active=True → always create a NEW window (unique per date).
+        - Close: is_active=False → deactivate the latest active window only.
+
+        Body: target_batch, target_subject, is_active, duration (optional, for open).
         """
 
         if allowed := check_allow_roles(
@@ -89,16 +91,16 @@ class AttendanceWindowView(APIView):
         data = request.data
         batch_id = data.get("target_batch")
         subject_id = data.get("target_subject")
+        is_active = data.get("is_active")
 
         if not batch_id or not subject_id:
             return Response(
-                {"message": "'batch' and 'subject' are required"},
+                {"message": "'target_batch' and 'target_subject' are required"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
         batch = get_object_or_404(Batch, pk=batch_id)
         subject = get_object_or_404(Subject, pk=subject_id)
-        print(batch, subject)
 
         if subject.batch_id != batch.id:
             return Response(
@@ -106,37 +108,48 @@ class AttendanceWindowView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        existing = (
-            Attendance_Window.objects.filter(target_batch=batch, target_subject=subject)
+        if is_active:
+            # Open: always create a new window (one per open = unique per date/session)
+            duration = data.get("duration")
+            if duration is not None:
+                duration = int(duration)
+            else:
+                duration = 30
+            duration = max(30, duration)
+
+            payload = {
+                "target_batch": batch.id,
+                "target_subject": subject.id,
+                "start_time": timezone.now(),
+                "duration": duration,
+                "is_active": True,
+                "last_interacted_by": request.user.id,
+            }
+            serializer = Attendance_WindowSerializer(data=payload)
+            if serializer.is_valid():
+                serializer.save()
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        # Close: deactivate the latest active window for this batch+subject
+        to_close = (
+            Attendance_Window.objects.filter(
+                target_batch=batch,
+                target_subject=subject,
+                is_active=True,
+            )
             .order_by("-id")
             .first()
         )
-
-        mutable_data = dict(data)
-        mutable_data["last_interacted_by"] = request.user.id
-
-        if existing:
-            requested_active = mutable_data.get("is_active", existing.is_active)
-
-            if requested_active:
-                mutable_data["start_time"] = timezone.now()
-
-            serializer = Attendance_WindowSerializer(
-                existing, data=mutable_data, partial=True
+        if not to_close:
+            return Response(
+                {"message": "No active window found to close."},
+                status=status.HTTP_404_NOT_FOUND,
             )
-            if serializer.is_valid():
-                serializer.save()
-                return Response(serializer.data, status=status.HTTP_200_OK)
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-        # Create new attendance window if none exists for this batch+subject
-        if mutable_data.get("is_active"):
-            mutable_data["start_time"] = timezone.now()
-        serializer = Attendance_WindowSerializer(data=mutable_data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        to_close.is_active = False
+        to_close.save(update_fields=["is_active"])
+        serializer = Attendance_WindowSerializer(to_close)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 class AttendanceRecordView(APIView):
