@@ -168,3 +168,61 @@ class AttendanceRecordSerializer(serializers.ModelSerializer):
     class Meta:
         model = Attendance_Record
         fields = "__all__"
+
+class AnnouncementSerializer(serializers.ModelSerializer):
+    """Serializer for Announcement model with nested user details."""
+
+    created_by = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Announcement
+        fields = [
+            "id",
+            "title",
+            "description",
+            "announcement_type",
+            "text_content",
+            "audio_url",
+            "video_url",
+            "created_by",
+            "target_batch",
+            "target_university",
+            "is_published",
+            "is_pinned",
+            "published_at",
+            "expires_at",
+            "created_at",
+            "updated_at",
+        ]
+
+    def get_created_by(self, obj):
+        """Return user info for the creator."""
+        if obj.created_by:
+            return {
+                "id": obj.created_by.id,
+                "name": obj.created_by.name,
+                "email": obj.created_by.email,
+                "role": obj.created_by.role,
+            }
+        return None
+
+
+class AnnouncementCreateUpdateSerializer(serializers.ModelSerializer):
+    """Serializer for creating/updating announcements."""
+
+    class Meta:
+        model = Announcement
+        fields = [
+            "title",
+            "description",
+            "announcement_type",
+            "text_content",
+            "audio_url",
+            "video_url",
+            "target_batch",
+            "target_university",
+            "is_published",
+            "is_pinned",
+            "published_at",
+            "expires_at",
+        ]

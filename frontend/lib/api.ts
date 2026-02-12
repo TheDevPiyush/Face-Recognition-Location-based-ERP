@@ -409,3 +409,75 @@ export async function fetchStudentCalendar(params: {
   return apiFetch(`/attendance/student-calendar/?${query.toString()}`);
 }
 
+// Announcements
+export async function getAnnouncements() {
+  return apiFetch('/announcements/');
+}
+
+export async function getAnnouncementById(id: number) {
+  return apiFetch(`/announcements/${id}/`);
+}
+
+export async function searchAnnouncements(query: string) {
+  return apiFetch(`/announcements/search/?q=${encodeURIComponent(query)}`);
+}
+
+export async function createAnnouncement(payload: any) {
+  return apiFetch('/announcements/', {
+    method: 'POST',
+    body: payload,
+  });
+}
+
+export async function updateAnnouncement(id: number, payload: any) {
+  return apiFetch(`/announcements/${id}/`, {
+    method: 'PUT',
+    body: payload,
+  });
+}
+
+export async function deleteAnnouncement(id: number) {
+  return apiFetch(`/announcements/${id}/`, {
+    method: 'DELETE',
+  });
+}
+
+export async function uploadAnnouncementMedia(file: File): Promise<{ url: string }> {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const token = getAccessToken();
+  const headers: Record<string, string> = {};
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  const res = await fetch(`${API_URL}/announcements/upload-media/`, {
+    method: 'POST',
+    headers,
+    body: formData,
+  });
+
+  if (res.status === 401) {
+    const newAccess = await refreshAccessToken();
+    if (newAccess) {
+      const retryRes = await fetch(`${API_URL}/announcements/upload-media/`, {
+        method: 'POST',
+        headers: { ...headers, Authorization: `Bearer ${newAccess}` },
+        body: formData,
+      });
+      if (!retryRes.ok) {
+        const msg = await parseErrorMessage(retryRes);
+        throw new Error(msg);
+      }
+      return (await retryRes.json()) as { url: string };
+    }
+    const msg = await parseErrorMessage(res);
+    throw new Error(msg || 'Unauthorized');
+  }
+
+  if (!res.ok) {
+    const msg = await parseErrorMessage(res);
+    throw new Error(msg || `Upload failed`);
+  }
+  return (await res.json()) as { url: string };
+}
+

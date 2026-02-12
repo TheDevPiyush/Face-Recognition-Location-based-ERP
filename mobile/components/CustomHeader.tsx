@@ -7,13 +7,15 @@ import { Fonts } from '@/constants/Fonts';
 
 interface CustomHeaderProps {
   title: string;
+  /** When true, use minimal top padding (for use inside SafeAreaView with edges excluding top) */
+  compact?: boolean;
 }
 
-export function CustomHeader({ title }: CustomHeaderProps) {
+export function CustomHeader({ title, compact }: CustomHeaderProps) {
   const insets = useSafeAreaInsets();
 
   return (
-    <View style={[styles.wrapper, { paddingTop: insets.top }]}>
+    <View style={[styles.wrapper, { paddingTop: compact ? 8 : insets.top }]}>
       <View style={styles.inner}>
         <Text style={styles.title} numberOfLines={1}>
           {title}

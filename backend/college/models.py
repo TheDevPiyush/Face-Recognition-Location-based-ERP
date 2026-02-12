@@ -178,7 +178,11 @@ class Attendance_Window(models.Model):
         blank=True,
     )
     created_at = models.DateTimeField(auto_now_add=True)
+    date = models.DateField(default=timezone.localdate)
 
+    class Meta:
+        unique_together = ("target_batch", "target_subject", "date")
+        
     def __str__(self):
         return f"{self.target_subject.name} ({self.target_batch.name})"
 
@@ -208,3 +212,71 @@ class Attendance_Record(models.Model):
         related_name="attendance_records_marked_by",
         db_index=True,
     )
+
+
+class Announcement(models.Model):
+    """Model to store announcements with support for text, audio, and video content."""
+
+    class AnnouncementType(models.TextChoices):
+        TEXT = "text", "Text"
+        AUDIO = "audio", "Audio"
+        VIDEO = "video", "Video"
+
+    # Basic fields
+    title = models.CharField(max_length=255, db_index=True)
+    description = models.TextField(null=True, blank=True)
+    announcement_type = models.CharField(
+        max_length=20,
+        choices=AnnouncementType.choices,
+        default=AnnouncementType.TEXT,
+        db_index=True,
+    )
+
+    # Content fields
+    text_content = models.TextField(null=True, blank=True)
+    audio_url = models.CharField(max_length=9999, null=True, blank=True)
+    video_url = models.CharField(max_length=9999, null=True, blank=True)
+
+    # Admin/Author info
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="announcements_created",
+    )
+
+    # Target audience
+    target_batch = models.ForeignKey(
+        Batch,
+        on_delete=models.CASCADE,
+        related_name="announcements",
+        null=True,
+        blank=True,
+    )
+    target_university = models.ForeignKey(
+        University,
+        on_delete=models.CASCADE,
+        related_name="announcements",
+        null=True,
+        blank=True,
+    )
+
+    # Status and visibility
+    is_published = models.BooleanField(default=True, db_index=True) # type: ignore[arg-type]
+    is_pinned = models.BooleanField(default=False, db_index=True) # type: ignore[arg-type]
+
+    # Timestamps
+    published_at = models.DateTimeField(default=timezone.now, db_index=True)
+    expires_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-is_pinned", "-published_at"]
+        indexes = [
+            models.Index(fields=["-is_pinned", "-published_at"]),
+        ]
+
+    def __str__(self):
+        return f"{self.title} ({self.get_announcement_type_display()})"

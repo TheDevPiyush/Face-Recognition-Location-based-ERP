@@ -132,9 +132,21 @@ export default function AttendanceScreen() {
     );
   }
 
-  const days = calendarData ? Array.from({ length: calendarData.days_in_month }, (_, i) => i + 1) : [];
-  const monthName = calendarData ? getMonthName(calendarData.month_number) : '';
-  const year = calendarData?.year || new Date().getFullYear();
+  let days: number[] = [];
+  let monthName = '';
+  let year = new Date().getFullYear();
+  let monthNumber = new Date().getMonth() + 1;
+
+  if (calendarData?.month) {
+    const [y, m] = calendarData.month.split('-').map(Number);
+    year = y;
+    monthNumber = m;
+
+    const daysInMonth = new Date(year, monthNumber, 0).getDate();
+    days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+    monthName = getMonthName(monthNumber);
+  }
+
 
   return (
     <View style={styles.screen}>
@@ -298,7 +310,7 @@ export default function AttendanceScreen() {
                         </View>
                         <View style={styles.datesRow}>
                           {days.map((day) => {
-                            const dateKey = `${calendarData.year}-${String(calendarData.month_number).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                            const dateKey = `${year}-${String(monthNumber).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
                             const status = item.dates[dateKey];
                             return (
                               <View key={day} style={styles.dateCell}>

@@ -35,17 +35,17 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="announcements"
+        options={{
+          title: 'Annoucements',
+          tabBarIcon: ({ color }) => <TabIcon name="mic-outline" color={color} />,
+        }}
+      />
+      <Tabs.Screen
         name="profile"
         options={{
           title: 'Profile',
           tabBarIcon: ({ color }) => <TabIcon name="person-outline" color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="two"
-        options={{
-          title: 'Tab Two',
-          tabBarIcon: ({ color }) => <TabIcon name="grid-outline" color={color} />,
         }}
       />
     </Tabs>

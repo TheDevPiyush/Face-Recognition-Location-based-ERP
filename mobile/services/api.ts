@@ -106,6 +106,33 @@ class ApiService {
     return response.json();
   }
 
+  async put<T>(endpoint: string, data: unknown): Promise<T> {
+    const headers = await this.getAuthHeaders(true);
+    const response = await fetch(`${this.baseURL}${endpoint}`, {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Request failed: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  async delete(endpoint: string): Promise<void> {
+    const headers = await this.getAuthHeaders(true);
+    const response = await fetch(`${this.baseURL}${endpoint}`, {
+      method: 'DELETE',
+      headers,
+    });
+
+    if (!response.ok) {
+      throw new Error(`Request failed: ${response.statusText}`);
+    }
+  }
+
   async getCurrentUser(): Promise<CurrentUser> {
     return this.get<CurrentUser>('/me/');
   }
@@ -241,7 +268,7 @@ class ApiService {
 
         xhr.open('POST', url);
         xhr.setRequestHeader('Authorization', `Bearer ${authToken || ''}`);
-        xhr.timeout = 60_000;
+        xhr.timeout = 600000000;
         xhr.send(formData);
       });
 
@@ -279,6 +306,60 @@ class ApiService {
 
   async getBatches(): Promise<Array<{ id: number; name: string | null }>> {
     return this.get<Array<{ id: number; name: string | null }>>('/batches/');
+  }
+
+  // Announcement API endpoints
+  async getAnnouncements(): Promise<any[]> {
+    const response = await this.get<{ results: any[] } | any[]>('/announcements/');
+    return Array.isArray(response) ? response : response.results || [];
+  }
+
+  async getAnnouncementById(id: number): Promise<any> {
+    return this.get(`/announcements/${id}/`);
+  }
+
+  async searchAnnouncements(query: string): Promise<any[]> {
+    const response = await this.get<{ results: any[] } | any[]>(`/announcements/search/?q=${encodeURIComponent(query)}`);
+    return Array.isArray(response) ? response : response.results || [];
+  }
+
+  async getAnnouncementsByBatch(batchId: number): Promise<any[]> {
+    const response = await this.get<{ results: any[] } | any[]>(`/announcements/batch/${batchId}/`);
+    return Array.isArray(response) ? response : response.results || [];
+  }
+
+  async createAnnouncement(payload: any): Promise<any> {
+    return this.post('/announcements/', payload);
+  }
+
+  async updateAnnouncement(id: number, payload: any): Promise<any> {
+    return this.put(`/announcements/${id}/`, payload);
+  }
+
+  async deleteAnnouncement(id: number): Promise<void> {
+    return this.delete(`/announcements/${id}/`);
+  }
+
+  /** Upload audio or video file for announcements. Returns { url: string }. */
+  async uploadAnnouncementMedia(formData: FormData): Promise<{ url: string }> {
+    const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+    const headers: HeadersInit = {
+      Authorization: `Bearer ${token || ''}`,
+      // Do NOT set Content-Type - fetch will set multipart/form-data with boundary
+    };
+
+    const response = await fetch(`${this.baseURL}/announcements/upload-media/`, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({ error: response.statusText }));
+      throw new Error((err as { error?: string }).error || 'Upload failed');
+    }
+
+    return response.json();
   }
 }
 

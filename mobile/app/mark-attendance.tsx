@@ -222,7 +222,8 @@ export default function MarkAttendanceScreen() {
     setUploading(true);
     setError(null);
     try {
-      await apiService.markAttendance(windowInfo.id, result.assets[0].uri);
+      const response = await apiService.markAttendance(windowInfo.id, result.assets[0].uri);
+      console.log(response);
       Alert.alert('Success', 'Attendance marked successfully.', [
         { text: 'OK', onPress: () => router.back() },
       ]);

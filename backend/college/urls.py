@@ -7,6 +7,14 @@ from .views.batch import BatchListCreateView, BatchDetailView
 from .views.subject import SubjectListCreateView, SubjectDetailView
 from .views.attendance import AttendanceWindowView, AttendanceRecordView
 from .views.analytics import AttendanceAnalyticsView, AttendanceMonthlyPercentageView, StudentCalendarView
+from .views.announcement import (
+    AnnouncementListCreateView,
+    AnnouncementDetailView,
+    AnnouncementSearchView,
+    AnnouncementByBatchView,
+    AnnouncementByUniversityView,
+)
+from .views.announcement_upload import AnnouncementMediaUploadView
 
 urlpatterns = [
     #
@@ -58,4 +66,15 @@ urlpatterns = [
     #
     path("me/", CurrentUserView.as_view(), name="current_user"),
     path("me/location/", UserLocationView.as_view(), name="me_location"),
+    #
+    #
+    # ---- Announcements ENDPOINTS :
+    #
+    #
+    path("announcements/", AnnouncementListCreateView.as_view(), name="announcements-list-create"),
+    path("announcements/<int:pk>/", AnnouncementDetailView.as_view(), name="announcement-detail"),
+    path("announcements/search/", AnnouncementSearchView.as_view(), name="announcements-search"),
+    path("announcements/batch/<int:batch_id>/", AnnouncementByBatchView.as_view(), name="announcements-by-batch"),
+    path("announcements/university/<int:university_id>/", AnnouncementByUniversityView.as_view(), name="announcements-by-university"),
+    path("announcements/upload-media/", AnnouncementMediaUploadView.as_view(), name="announcement-media-upload"),
 ]

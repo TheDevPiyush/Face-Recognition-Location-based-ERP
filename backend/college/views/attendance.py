@@ -7,6 +7,7 @@ from rest_framework.permissions import IsAuthenticated
 from django.utils import timezone
 from datetime import timedelta
 from shapely.geometry import Point, Polygon
+from django.db import transaction
 
 from college.utils.check_roles import check_allow_roles
 from services.face_recognition import has_face
@@ -75,12 +76,12 @@ class AttendanceWindowView(APIView):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def post(self, request):
-        """Create or close an attendance window for batch+subject.
+        """Open or close attendance window for a batch+subject for today.
 
-        - Open: is_active=True → always create a NEW window (unique per date).
-        - Close: is_active=False → deactivate the latest active window only.
-
-        Body: target_batch, target_subject, is_active, duration (optional, for open).
+        Rules:
+        - Only one window per (batch + subject + date).
+        - If window exists → update it.
+        - If not → create it.
         """
 
         if allowed := check_allow_roles(
@@ -93,9 +94,9 @@ class AttendanceWindowView(APIView):
         subject_id = data.get("target_subject")
         is_active = data.get("is_active")
 
-        if not batch_id or not subject_id:
+        if batch_id is None or subject_id is None or is_active is None:
             return Response(
-                {"message": "'target_batch' and 'target_subject' are required"},
+                {"message": "'target_batch', 'target_subject', and 'is_active' are required"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -108,48 +109,41 @@ class AttendanceWindowView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        if is_active:
-            # Open: always create a new window (one per open = unique per date/session)
-            duration = data.get("duration")
-            if duration is not None:
-                duration = int(duration)
-            else:
-                duration = 30
-            duration = max(30, duration)
+        today = timezone.localdate()
 
-            payload = {
-                "target_batch": batch.id,
-                "target_subject": subject.id,
-                "start_time": timezone.now(),
-                "duration": duration,
-                "is_active": True,
-                "last_interacted_by": request.user.id,
-            }
-            serializer = Attendance_WindowSerializer(data=payload)
-            if serializer.is_valid():
-                serializer.save()
-                return Response(serializer.data, status=status.HTTP_201_CREATED)
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        duration = data.get("duration")
+        duration = max(30, int(duration)) if duration else 30
 
-        # Close: deactivate the latest active window for this batch+subject
-        to_close = (
-            Attendance_Window.objects.filter(
+        with transaction.atomic():
+            window, created = Attendance_Window.objects.get_or_create(
                 target_batch=batch,
                 target_subject=subject,
-                is_active=True,
+                date=today,
+                defaults={
+                    "start_time": timezone.now(),
+                    "duration": duration,
+                    "is_active": is_active,
+                    "last_interacted_by": request.user,
+                },
             )
-            .order_by("-id")
-            .first()
+
+            if not created:
+                # Update existing window
+                window.is_active = is_active
+                window.last_interacted_by = request.user
+
+                if is_active:
+                    window.start_time = timezone.now()
+                    window.duration = duration
+
+                window.save()
+
+        serializer = Attendance_WindowSerializer(window)
+
+        return Response(
+            serializer.data,
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
         )
-        if not to_close:
-            return Response(
-                {"message": "No active window found to close."},
-                status=status.HTTP_404_NOT_FOUND,
-            )
-        to_close.is_active = False
-        to_close.save(update_fields=["is_active"])
-        serializer = Attendance_WindowSerializer(to_close)
-        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 class AttendanceRecordView(APIView):
@@ -278,7 +272,7 @@ class AttendanceRecordView(APIView):
             )
 
         # 25.632935, 85.101305
-        # Polygon check
+        # Polygon check (Co-ordinates of the building where attedance is mandatory)
         boundary_latlon = [
             (25.632875, 85.101206),
             (25.632820, 85.101317),
