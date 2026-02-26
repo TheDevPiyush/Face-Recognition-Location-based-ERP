@@ -151,8 +151,8 @@ class UserStudentSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ["id", "name", "email", "role", "batch", "profile_picture"]
-        read_only_fields = ["id", "name", "email", "role", "batch"]
+        fields = ["id", "name", "email", "role", "batch", "profile_picture", "can_update_picture"]
+        read_only_fields = ["id", "name", "email", "role", "batch", "can_update_picture"]
 
 
 class Attendance_WindowSerializer(serializers.ModelSerializer):

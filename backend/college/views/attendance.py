@@ -14,7 +14,7 @@ from services.face_recognition import has_face
 from ..models import Batch, Subject, Attendance_Window, User, Attendance_Record
 from ..serializers import Attendance_WindowSerializer, AttendanceRecordSerializer
 
-FACE_MATCH_THRESHOLD = 0.8
+FACE_MATCH_THRESHOLD = 0.95
 
 
 class AttendanceWindowView(APIView):
@@ -206,11 +206,28 @@ class AttendanceRecordView(APIView):
         ):
             return allowed
 
-        user_data = (
-            User.objects.annotate(distance=L2Distance("face_embedding", encoding_vector))
-            .order_by("distance")
-            .first()
-        )
+        # STUDENT: compare only with self
+        if request.user.role == User.Role.STUDENT:
+            if request.user.face_embedding is None:
+                return Response(
+                    {"error": "No face registered for this user"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            user_data = (
+                User.objects.filter(id=request.user.id)
+                .annotate(distance=L2Distance("face_embedding", encoding_vector))
+                .first()
+            )
+
+        # TEACHER / ADMIN: search whole database
+        else:
+            user_data = (
+                User.objects.annotate(distance=L2Distance("face_embedding", encoding_vector))
+                .order_by("distance")
+                .first()
+            )
+
         print(user_data)
         print(user_data.distance)
 

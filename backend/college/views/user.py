@@ -109,10 +109,7 @@ class CurrentUserView(APIView):
         user = request.user
 
         # Use role-based serializers if needed
-        if user.role == User.Role.STUDENT:
-            serializer = UserStudentSerializer(user)
-        else:
-            serializer = UserStudentSerializer(user)
+        serializer = UserStudentSerializer(user)
 
         return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -122,7 +119,7 @@ class CurrentUserView(APIView):
 
     def patch(self, request):
         user = request.user
-        data = request.data.copy()
+        data = request.data.dict()
 
         if not user.can_update_picture:
             return Response(

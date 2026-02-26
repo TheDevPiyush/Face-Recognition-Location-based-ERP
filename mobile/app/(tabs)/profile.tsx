@@ -1,4 +1,5 @@
 import React, { useCallback, useState } from 'react';
+import * as ImagePicker from 'expo-image-picker';
 import {
   View,
   Text,
@@ -52,10 +53,62 @@ export default function ProfileScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+
+  // Image upload state
+  const [uploading, setUploading] = useState(false);
+
+  const handleEditPicture = useCallback(async () => {
+    if (!user?.can_update_picture) return;
+
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert(
+        'Permission required',
+        'Please allow access to your photos to update your profile picture.'
+      );
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.7,
+    });
+
+    if (result.canceled) return;
+
+    const asset = result.assets[0];
+    if (!asset?.uri) return;
+
+    setUploading(true);
+
+    try {
+      const formData = new FormData();
+      formData.append('profile_picture', {
+        uri: asset.uri,
+        name: 'profile.jpg',
+        type: 'image/jpeg',
+      } as any);
+
+      const response = await apiService.patchCurrentUser(formData);
+      setUser(response);
+
+      Alert.alert('Success', 'Profile picture updated!');
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Failed to update image';
+      Alert.alert('Error', msg);
+    } finally {
+      setUploading(false);
+    }
+  }, [user]);
+
+
   const fetchUser = useCallback(async () => {
     try {
       setError(null);
       const data = await apiService.getCurrentUser();
+      console.log(data)
       setUser(data);
     } catch (e) {
       console.log(e)
@@ -137,6 +190,13 @@ export default function ProfileScreen() {
                 <Ionicons name="person" size={40} color={AppColors.text.link} />
               </View>
             )}
+            {/* Edit icon overlay if allowed */}
+            {user?.can_update_picture ? (
+              <TouchableOpacity style={styles.editIcon} activeOpacity={0.7} onPress={handleEditPicture} disabled={uploading}>
+                <Ionicons name="create-outline" size={22} color={AppColors.primary[600]} />
+                {uploading ? <ActivityIndicator size={16} color={AppColors.primary[600]} style={{ position: 'absolute', top: -18, right: -18 }} /> : null}
+              </TouchableOpacity>
+            ) : null}
           </View>
           <View style={styles.headerInfo}>
             <Text style={styles.name} numberOfLines={1}>{user?.name ?? 'No name'}</Text>
@@ -149,11 +209,11 @@ export default function ProfileScreen() {
         </View>
 
         <View style={styles.card}>
-        <Text style={styles.cardTitle}>Details</Text>
-        <InfoRow icon="mail-outline" label="Email" value={user?.email ?? null} />
-        <InfoRow icon="person-outline" label="Role" value={roleLabel} />
-        <InfoRow icon="school-outline" label="Batch" value={batchLabel} last />
-      </View>
+          <Text style={styles.cardTitle}>Details</Text>
+          <InfoRow icon="mail-outline" label="Email" value={user?.email ?? null} />
+          <InfoRow icon="person-outline" label="Role" value={roleLabel} />
+          <InfoRow icon="school-outline" label="Batch" value={batchLabel} last />
+        </View>
 
         <TouchableOpacity
           style={styles.logoutButton}
@@ -224,6 +284,20 @@ const styles = StyleSheet.create({
   },
   avatarWrapper: {
     marginRight: 16,
+    position: 'relative',
+  },
+  editIcon: {
+    position: 'absolute',
+    bottom: 8,
+    right: 8,
+    backgroundColor: AppColors.background.primary,
+    borderRadius: 16,
+    padding: 4,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
   },
   avatar: {
     width: 96,

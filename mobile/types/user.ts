@@ -18,4 +18,5 @@ export interface CurrentUser {
   role: string | null;
   batch: BatchInfo | null;
   profile_picture: string | null;
+  can_update_picture: boolean
 }

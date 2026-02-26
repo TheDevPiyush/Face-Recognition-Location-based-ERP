@@ -47,7 +47,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "corsheaders",
     "rest_framework",
-    "college",
+    "college.apps.UsersConfig",
     "pgvector.django"
 ]
 

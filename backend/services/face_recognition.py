@@ -3,15 +3,16 @@ from functools import lru_cache
 
 import numpy as np
 from PIL import Image
-from deepface import DeepFace  # type: ignore[import]
+from deepface import DeepFace
+import os
 
 
 @lru_cache(maxsize=1)
 def _get_model_kwargs():
     """Cache DeepFace kwargs so the model loads only once."""
     return {
-        "model_name": "Facenet512",
-        "detector_backend": "retinaface",
+        "model_name": "ArcFace",
+        "detector_backend": "opencv",
         "enforce_detection": True,
     }
 
@@ -75,3 +76,27 @@ def has_face(image_file):
 
     image_file.seek(0)
     return True, embedding_array
+
+
+def warmup_face_model():
+    """
+    Loads the face model into memory at server startup
+    so the first request is fast.
+    """
+    try:
+
+        base_dir = os.path.dirname(os.path.dirname(__file__))
+
+        image_path = os.path.join(base_dir, "test_images", "test.jpg")
+
+        DeepFace.represent(
+            img_path=image_path,
+            model_name="ArcFace",         
+            detector_backend="opencv",
+            enforce_detection=True,      
+        )
+
+        print("✅ Face model warmed up successfully.")
+
+    except Exception as e:
+        print("❌ Face model warmup failed:", e)

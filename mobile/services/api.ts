@@ -10,6 +10,24 @@ import type { AttendanceWindow } from '@/types/window';
 export type { LoginRequest, LoginResponse };
 
 class ApiService {
+    /** PATCH current user profile (including image upload). */
+    async patchCurrentUser(formData: FormData): Promise<CurrentUser> {
+      const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+      const headers: HeadersInit = {
+        Authorization: `Bearer ${token || ''}`,
+        // Do NOT set Content-Type - fetch will set multipart/form-data with boundary
+      };
+      const response = await fetch(`${this.baseURL}/me/`, {
+        method: 'PATCH',
+        headers,
+        body: formData,
+      });
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({ error: response.statusText }));
+        throw new Error((err as { error?: string }).error || 'Profile update failed');
+      }
+      return response.json();
+    }
   private baseURL: string;
 
   constructor() {
