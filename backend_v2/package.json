@@ -7,6 +7,12 @@
     "@types/bun": "latest",
     "drizzle-kit": "^0.31.9"
   },
+  "scripts": {
+    "db:migrate": "bun drizzle-kit migrate",
+    "db:generate": "bun drizzle-kit generate",
+    "backend": "bun --watch index.ts",
+    "seed": "bun src/scripts/seedDB.ts"
+  },
   "peerDependencies": {
     "typescript": "^5"
   },
@@ -15,12 +21,14 @@
     "@aws-sdk/client-s3": "^3.999.0",
     "@types/express": "^5.0.6",
     "@types/jsonwebtoken": "^9.0.10",
+    "@types/multer": "^2.0.0",
     "@types/nodemailer": "^7.0.9",
     "crypto": "^1.0.1",
     "dotenv": "^17.3.0",
     "drizzle-orm": "^0.45.1",
     "express": "^5.2.1",
     "jsonwebtoken": "^9.0.3",
+    "multer": "^2.0.2",
     "nodemailer": "^8.0.1",
     "pg": "^8.19.0",
     "pgvector": "^0.2.1",
