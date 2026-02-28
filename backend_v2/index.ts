@@ -20,7 +20,7 @@ const PORT = process.env.PORT || 8080;
 app.use(express.json());
 
 app.get('/', (_, res: Response) => {
-    res.send({ "message": "OK" });
+    res.send({ "message": "backend_v2 health ok!" });
 });
 
 app.use('/api/auth', authRouter);

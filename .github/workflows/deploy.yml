@@ -22,7 +22,7 @@ jobs:
             cd ~/projects/Face-Recognition-Location-based-ERP
             git pull origin master
 
-            echo "${{ secrets.BACKEND_ENV }}" > backend/.env
+            echo "${{ secrets.BACKEND_ENV }}" > backend_v2/.env
             echo "${{ secrets.FRONTEND_ENV }}" > frontend/.env.local
 
             docker-compose down

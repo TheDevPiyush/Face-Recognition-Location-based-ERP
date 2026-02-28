@@ -1,26 +1,13 @@
-FROM python:3.10-bullseye
-
-ENV DEBIAN_FRONTEND=noninteractive
+FROM oven/bun:1-alpine
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y \
-    build-essential \
-    libopenblas-dev \
-    liblapack-dev \
-    libx11-dev \
-    libgtk-3-dev \
-    libgl1 \
-    libglib2.0-0 \
-    libpq-dev \
-    && rm -rf /var/lib/apt/lists/*
+COPY package.json bun.lock ./
 
-COPY requirements.txt .
-
-RUN pip install --upgrade pip setuptools wheel \
-    && pip install numpy==1.26.4 \
-    && pip install -r requirements.txt
+RUN bun install --frozen-lockfile
 
 COPY . .
 
 EXPOSE 8080
+
+CMD ["bun", "run", "index.ts"]

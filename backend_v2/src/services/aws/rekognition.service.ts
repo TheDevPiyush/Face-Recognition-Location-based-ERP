@@ -28,7 +28,6 @@ export async function registerFace(
     );
 
     const faceId = result.FaceRecords?.[0]?.Face?.FaceId;
-    console.log('---', userId)
 
     if (!faceId) {
         throw new Error("No face detected in the image.");
