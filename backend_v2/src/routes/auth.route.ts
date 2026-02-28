@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { sendVerificatonCode, verifyCode } from "../../controllers/auth/auth.controller";
+import { sendVerificatonCode, verifyCode } from "../controllers/auth.controller";
 
 export const authRouter = Router()
 

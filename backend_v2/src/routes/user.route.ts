@@ -1,7 +1,7 @@
 import { Router } from "express";
 import multer from "multer";
 
-import { authenticate, requireStaff } from "../../middlewares/verifyToken";
+import { authenticate, requireStaff } from "../middlewares/verifyToken";
 
 import {
     getUsers,
@@ -12,7 +12,7 @@ import {
     getCurrentUser,
     updateCurrentUser,
     updateLocation,
-} from "../../controllers/user/user.controller";
+} from "../controllers/user.controller";
 
 const userRouter = Router();
 

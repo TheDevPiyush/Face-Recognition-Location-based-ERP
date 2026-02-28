@@ -1,7 +1,11 @@
 import { Router } from "express";
 import multer from "multer";
-import { authenticate } from "../../middlewares/verifyToken";
-import { getAttendanceWindow, markAttendance, upsertAttendanceWindow } from "../../controllers/attendance/attendance.controller";
+import { authenticate } from "../middlewares/verifyToken";
+import {
+    getAttendanceWindow,
+    markAttendance,
+    upsertAttendanceWindow
+} from "../controllers/attendance.controller";
 
 const attendanceRouter = Router();
 

@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
-import { db } from "../../db";
-import { universities } from "../../db/schema";
+import { db } from "../db";
+import { universities } from "../db/schema";
 import { eq } from "drizzle-orm";
 
 function serverError(res: Response, err: unknown, context = "Operation failed") {
@@ -13,7 +13,7 @@ function param(value: string | string[] | undefined): any {
     return Array.isArray(value) ? value[0] : value;
 }
 
-// Returns all universities
+
 export const getUniversities = async (_req: Request, res: Response) => {
     try {
         const all = await db.select().from(universities);
@@ -23,7 +23,7 @@ export const getUniversities = async (_req: Request, res: Response) => {
     }
 };
 
-// Creates a new university
+
 export const createUniversity = async (req: Request, res: Response) => {
     try {
         if (!req.body || Object.keys(req.body).length === 0) {
@@ -40,7 +40,7 @@ export const createUniversity = async (req: Request, res: Response) => {
     }
 };
 
-// Returns a single university by ID
+
 export const getUniversity = async (req: Request, res: Response) => {
     try {
         const pk = param(req.params.pk);

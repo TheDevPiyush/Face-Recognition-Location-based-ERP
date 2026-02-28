@@ -8,7 +8,7 @@ import type { StudentCalendarResponse } from '@/types/attendance';
 
 // ─── Auth types ───────────────────────────────────────────────────────────────
 export interface SendCodeResponse { message: string }
-export interface VerifyCodeResponse { token: string; user: CurrentUser }
+export interface VerifyCodeResponse { success: boolean; message: string; data: { token: string; user?: CurrentUser } }
 
 // ─── Helper ───────────────────────────────────────────────────────────────────
 const parseError = (body: string, fallback = 'Request failed'): string => {
@@ -40,6 +40,15 @@ class ApiService {
       ...(json && { 'Content-Type': 'application/json' }),
       ...(token && { Authorization: `Bearer ${token}` }),
     } as HeadersInit;
+  }
+
+  private normalizeWindow(w: any): AttendanceWindow {
+    return {
+      ...w,
+      is_active: w.is_active ?? w.isActive ?? false,
+      start_time: w.start_time ?? w.startTime ?? null,
+      duration: w.duration ?? w.durationSec ?? null,
+    };
   }
 
   // ── Core methods ─────────────────────────────────────────────────────────
@@ -157,9 +166,10 @@ class ApiService {
 
   /** GET /api/attendance/window?target_batch=&target_subject= */
   async getWindow(target_batch: string, target_subject: string): Promise<AttendanceWindow> {
-    return this.get<AttendanceWindow>(
+    const raw = await this.get<any>(
       `/attendance/window?target_batch=${target_batch}&target_subject=${target_subject}`
     );
+    return this.normalizeWindow(raw);
   }
 
   /** POST /api/attendance/window */
@@ -169,7 +179,8 @@ class ApiService {
     is_active: boolean;
     duration?: number;
   }): Promise<AttendanceWindow> {
-    return this.post<AttendanceWindow>('/attendance/window', params);
+    const raw = await this.post<any>('/attendance/window', params);
+    return this.normalizeWindow(raw);
   }
 
   // ── Attendance record ─────────────────────────────────────────────────────
@@ -188,7 +199,11 @@ class ApiService {
   }
 
   /** POST /api/attendance/record — multipart: student_picture + attendance_window */
-  async markAttendance(attendance_window: string, imageUri: string): Promise<unknown> {
+  async markAttendance(
+    attendance_window: any,
+    imageUri: string,
+    location?: { latitude: number; longitude: number } | null,
+  ): Promise<unknown> {
     const uploadUri = await this.ensureFileUri(imageUri);
     const token = await this.getToken();
     const url = `${this.baseURL}/attendance/record`;
@@ -200,6 +215,12 @@ class ApiService {
       name: 'student-picture.jpg',
     });
     formData.append('attendance_window', attendance_window);
+
+    // Include location if provided (production mode)
+    if (location) {
+      formData.append('latitude', String(location.latitude));
+      formData.append('longitude', String(location.longitude));
+    }
 
     const result = await new Promise<{ status: number; body: string }>((resolve, reject) => {
       const xhr = new XMLHttpRequest();
@@ -227,6 +248,52 @@ class ApiService {
 
     try { return result.body ? JSON.parse(result.body) : {}; } catch { return {}; }
   }
+  // ── Analytics ─────────────────────────────────────────────────────────────
+
+  /** GET /api/attendance/analytics */
+  async getAttendanceAnalytics(params: {
+    month?: string;
+    batch_id?: string;
+    subject_id?: string;
+    student_id?: string;
+    start_date?: string;
+    end_date?: string;
+  }): Promise<any> {
+    const sp = new URLSearchParams();
+    if (params.month) sp.set("month", params.month);
+    if (params.batch_id) sp.set("batch_id", params.batch_id);
+    if (params.subject_id) sp.set("subject_id", params.subject_id);
+    if (params.student_id) sp.set("student_id", params.student_id);
+    if (params.start_date) sp.set("start_date", params.start_date);
+    if (params.end_date) sp.set("end_date", params.end_date);
+    const qs = sp.toString();
+    return this.get(`/analytics${qs ? `?${qs}` : ""}`);
+  }
+
+  /** GET /api/attendance/student-calendar */
+  async getStudentCalendar(params?: { month?: string }): Promise<any> {
+    const qs = params?.month ? `?month=${params.month}` : "";
+    return this.get(`/analytics/student-calendar${qs}`);
+  }
+
+  // ── Announcements ─────────────────────────────────────────────────────────
+
+  /** GET /api/announcement */
+  async getAnnouncements(): Promise<any[]> {
+    return this.get<any[]>("/announcement");
+  }
+
+  /** GET /api/announcement/:id */
+  async getAnnouncementById(id: string): Promise<any> {
+    return this.get(`/announcement/${id}`);
+  }
+
+  /** GET /api/announcement/search?q= */
+  async searchAnnouncements(query: string): Promise<any[]> {
+    return this.get<any[]>(`/announcement/search?q=${encodeURIComponent(query)}`);
+  }
+
+
 }
 
 export const apiService = new ApiService();

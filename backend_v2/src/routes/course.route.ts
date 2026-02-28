@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { authenticate, requireStaff } from "../../middlewares/verifyToken";
-import { createCourse, getCourse, getCourses } from "../../controllers/course/course.controller";
+import { authenticate, requireStaff } from "../middlewares/verifyToken";
+import { createCourse, getCourse, getCourses } from "../controllers/course.controller";
 
 const courseRouter = Router();
 

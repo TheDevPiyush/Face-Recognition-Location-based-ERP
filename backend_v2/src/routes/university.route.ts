@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { authenticate, requireStaff } from "../../middlewares/verifyToken";
-import { createUniversity, getUniversities, getUniversity } from "../../controllers/university/university.controller";
+import { authenticate, requireStaff } from "../middlewares/verifyToken";
+import { createUniversity, getUniversities, getUniversity } from "../controllers/university.controller";
 
 const universityRouter = Router();
 

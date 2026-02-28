@@ -1,7 +1,8 @@
 import type { Request, Response } from "express";
-import { db } from "../../db";
-import { subjects } from "../../db/schema";
+import { db } from "../db";
+import { subjects } from "../db/schema";
 import { eq } from "drizzle-orm";
+
 
 function serverError(res: Response, err: unknown, context = "Operation failed") {
     console.error(`[subject.controller] ${context}:`, err);
@@ -13,9 +14,10 @@ function param(value: string | string[] | undefined): any {
     return Array.isArray(value) ? value[0] : value;
 }
 
-// Returns all subjects
+
 export const getSubjects = async (_req: Request, res: Response) => {
     try {
+       
         const all = await db.select().from(subjects);
         return res.status(200).json(all);
     } catch (err) {
@@ -23,7 +25,7 @@ export const getSubjects = async (_req: Request, res: Response) => {
     }
 };
 
-// Creates a new subject
+
 export const createSubject = async (req: Request, res: Response) => {
     try {
         if (!req.body || Object.keys(req.body).length === 0) {
@@ -40,9 +42,10 @@ export const createSubject = async (req: Request, res: Response) => {
     }
 };
 
-// Returns a single subject by ID
+
 export const getSubject = async (req: Request, res: Response) => {
     try {
+       
         const pk = param(req.params.pk);
         if (!pk) return res.status(400).json({ error: "Subject ID is required" });
 

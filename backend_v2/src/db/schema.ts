@@ -113,6 +113,7 @@ export const users = pgTable(
     /* ================= BASIC INFO ================= */
 
     name: varchar("name", { length: 255 }),
+    enrolledAt: timestamp("enrolled_at"),
 
     imageUrl: text("image_url"),
     collegeId: varchar("college_id", { length: 255 }).unique(),

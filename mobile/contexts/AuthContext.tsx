@@ -10,9 +10,12 @@ interface AuthContextType {
     user: CurrentUser | null;
     isLoading: boolean;
     isAuthenticated: boolean;
+    /** Step 1 — send OTP code to email */
     sendCode: (email: string) => Promise<void>;
+    /** Step 2 — verify code, saves token + user, navigates to app */
     verifyCode: (email: string, code: string) => Promise<void>;
     logout: () => Promise<void>;
+    /** Refresh user data from server and update stored user */
     refreshUser: () => Promise<void>;
 }
 
@@ -81,8 +84,21 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     /** Step 2 — verifies code, persists token + user, navigates into app */
     const verifyCode = async (email: string, code: string): Promise<void> => {
-        const { token, user: userData } = await apiService.verifyCode(email, code);
-        await saveSession(token, userData);
+        const response = await apiService.verifyCode(email, code);
+        // backend returns { success, message, data: { token } }
+        const token = (response as any).data?.token;
+        const userData = (response as any).data?.user ?? (response as any).user;
+
+        if (!token) throw new Error("Server did not return a token. Please try again.");
+
+        // if no user object returned, fetch it separately using the token
+        if (userData) {
+            await saveSession(token, userData);
+        } else {
+            await AsyncStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, token);
+            const freshUser = await apiService.getCurrentUser();
+            await saveSession(token, freshUser);
+        }
         router.replace('/(tabs)');
     };
 

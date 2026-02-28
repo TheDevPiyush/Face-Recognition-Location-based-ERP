@@ -2,15 +2,15 @@ import express from 'express';
 import type { Response } from 'express';
 import dotenv from 'dotenv'
 import { errorHandler } from './src/middlewares/errorMiddleware';
-import { authRouter } from './src/routes/auth/auth.route';
-import userRouter from './src/routes/user/user.route';
-import attendanceRouter from './src/routes/attendance/attendance.router';
-import batchRouter from './src/routes/batch/batch.route';
-import universityRouter from './src/routes/university/university.route';
-import courseRouter from './src/routes/course/course.route';
-import subjectRouter from './src/routes/subject/subject.route';
-import { analyticsRouter } from './src/routes/analytics/analytics.router';
-import { announcementRouter } from './src/routes/annoucement/annoucement.route';
+import { authRouter } from './src/routes/auth.route';
+import userRouter from './src/routes/user.route';
+import attendanceRouter from './src/routes/attendance.router';
+import batchRouter from './src/routes/batch.route';
+import universityRouter from './src/routes/university.route';
+import courseRouter from './src/routes/course.route';
+import subjectRouter from './src/routes/subject.route';
+import { analyticsRouter } from './src/routes/analytics.router';
+import { announcementRouter } from './src/routes/annoucement.route';
 
 dotenv.config();
 

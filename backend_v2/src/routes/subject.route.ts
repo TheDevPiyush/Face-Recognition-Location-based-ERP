@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { authenticate, requireStaff } from "../../middlewares/verifyToken";
-import { createSubject, getSubject, getSubjects } from "../../controllers/subject/subject.controller";
+import { authenticate, requireStaff } from "../middlewares/verifyToken";
+import { createSubject, getSubject, getSubjects } from "../controllers/subject.controller";
 
 const subjectRouter = Router();
 

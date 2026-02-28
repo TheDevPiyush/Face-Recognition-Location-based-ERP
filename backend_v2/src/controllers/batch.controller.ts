@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
-import { db } from "../../db";
-import { batches } from "../../db/schema";
+import { db } from "../db";
+import { batches } from "../db/schema";
 import { eq } from "drizzle-orm";
 
 function serverError(res: Response, err: unknown, context = "Operation failed") {
@@ -8,12 +8,13 @@ function serverError(res: Response, err: unknown, context = "Operation failed") 
     return res.status(500).json({ error: context });
 }
 
+
 function param(value: string | string[] | undefined): any {
     if (value === undefined) return null;
     return Array.isArray(value) ? value[0] : value;
 }
 
-// Returns all batches
+
 export const getBatches = async (_req: Request, res: Response) => {
     try {
         const all = await db.select().from(batches);
@@ -23,7 +24,7 @@ export const getBatches = async (_req: Request, res: Response) => {
     }
 };
 
-// Creates a new batch
+
 export const createBatch = async (req: Request, res: Response) => {
     try {
         if (!req.body || Object.keys(req.body).length === 0) {
@@ -40,7 +41,7 @@ export const createBatch = async (req: Request, res: Response) => {
     }
 };
 
-// Returns a single batch by ID
+
 export const getBatch = async (req: Request, res: Response) => {
     try {
         const pk = param(req.params.pk);
