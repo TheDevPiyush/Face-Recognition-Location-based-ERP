@@ -3,102 +3,114 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import { STORAGE_KEYS } from '@/constants/Config';
 import { apiService } from '@/services/api';
-import { LoginRequest, LoginResponse, User } from '@/types/auth';
+import type { CurrentUser } from '@/types/user';
 
+// ─── Types ────────────────────────────────────────────────────────────────────
 interface AuthContextType {
-  user: User | null;
-  isLoading: boolean;
-  isAuthenticated: boolean;
-  login: (credentials: LoginRequest) => Promise<void>;
-  logout: () => Promise<void>;
-  checkSession: () => Promise<void>;
+    user: CurrentUser | null;
+    isLoading: boolean;
+    isAuthenticated: boolean;
+    sendCode: (email: string) => Promise<void>;
+    verifyCode: (email: string, code: string) => Promise<void>;
+    logout: () => Promise<void>;
+    refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
+    const ctx = useContext(AuthContext);
+    if (!ctx) throw new Error('useAuth must be used within an AuthProvider');
+    return ctx;
 };
 
-interface AuthProviderProps {
-  children: ReactNode;
-}
+// ─── Provider ─────────────────────────────────────────────────────────────────
+export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+    const [user, setUser] = useState<CurrentUser | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
 
-export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+    // ── Session helpers ──────────────────────────────────────────────────────
 
-  const saveSession = async (data: LoginResponse) => {
-    await AsyncStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, data.access);
-    await AsyncStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, data.refresh);
-    await AsyncStorage.setItem(STORAGE_KEYS.USER_DATA, JSON.stringify(data.user));
-    setUser(data.user);
-  };
+    const saveSession = async (token: string, userData: CurrentUser) => {
+        await AsyncStorage.multiSet([
+            [STORAGE_KEYS.ACCESS_TOKEN, token],
+            [STORAGE_KEYS.USER_DATA, JSON.stringify(userData)],
+        ]);
+        setUser(userData);
+    };
 
-  const clearSession = async () => {
-    await AsyncStorage.multiRemove([
-      STORAGE_KEYS.ACCESS_TOKEN,
-      STORAGE_KEYS.REFRESH_TOKEN,
-      STORAGE_KEYS.USER_DATA,
-    ]);
-    setUser(null);
-  };
-
-  const checkSession = async () => {
-    try {
-      const [accessToken, userData] = await AsyncStorage.multiGet([
-        STORAGE_KEYS.ACCESS_TOKEN,
-        STORAGE_KEYS.USER_DATA,
-      ]);
-
-      if (accessToken[1] && userData[1]) {
-        setUser(JSON.parse(userData[1]));
-      } else {
+    const clearSession = async () => {
+        await AsyncStorage.multiRemove([
+            STORAGE_KEYS.ACCESS_TOKEN,
+            STORAGE_KEYS.USER_DATA,
+        ]);
         setUser(null);
-      }
-    } catch (error) {
-      console.error('Error checking session:', error);
-      setUser(null);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    };
 
-  const login = async (credentials: LoginRequest) => {
-    try {
-      const response = await apiService.login(credentials);
-      await saveSession(response);
-      router.replace('/(tabs)');
-    } catch (error) {
-      throw error;
-    }
-  };
+    // ── Bootstrap — restore session on app launch ────────────────────────────
 
-  const logout = async () => {
-    await clearSession();
-    router.replace('/login');
-  };
+    useEffect(() => {
+        const restore = async () => {
+            try {
+                const [[, token], [, userData]] = await AsyncStorage.multiGet([
+                    STORAGE_KEYS.ACCESS_TOKEN,
+                    STORAGE_KEYS.USER_DATA,
+                ]);
 
-  useEffect(() => {
-    checkSession();
-  }, []);
+                if (token && userData) {
+                    setUser(JSON.parse(userData) as CurrentUser);
+                } else {
+                    setUser(null);
+                }
+            } catch {
+                setUser(null);
+            } finally {
+                setIsLoading(false);
+            }
+        };
 
-  return (
-    <AuthContext.Provider
-      value={{
-        user,
-        isLoading,
-        isAuthenticated: !!user,
-        login,
-        logout,
-        checkSession,
-      }}
-    >
-      {children}
-    </AuthContext.Provider>
-  );
+        restore();
+    }, []);
+
+    // ── Auth actions ─────────────────────────────────────────────────────────
+
+    /** Step 1 — just sends the code, no session changes */
+    const sendCode = async (email: string): Promise<void> => {
+        await apiService.sendCode(email);
+    };
+
+    /** Step 2 — verifies code, persists token + user, navigates into app */
+    const verifyCode = async (email: string, code: string): Promise<void> => {
+        const { token, user: userData } = await apiService.verifyCode(email, code);
+        await saveSession(token, userData);
+        router.replace('/(tabs)');
+    };
+
+    const logout = async (): Promise<void> => {
+        await clearSession();
+        router.replace('/login');
+    };
+
+    /** Re-fetch user from server — useful after profile updates */
+    const refreshUser = async (): Promise<void> => {
+        const fresh = await apiService.getCurrentUser();
+        await AsyncStorage.setItem(STORAGE_KEYS.USER_DATA, JSON.stringify(fresh));
+        setUser(fresh);
+    };
+
+    return (
+        <AuthContext.Provider
+            value={{
+                user,
+                isLoading,
+                isAuthenticated: !!user,
+                sendCode,
+                verifyCode,
+                logout,
+                refreshUser,
+            }}
+        >
+            {children}
+        </AuthContext.Provider>
+    );
 };

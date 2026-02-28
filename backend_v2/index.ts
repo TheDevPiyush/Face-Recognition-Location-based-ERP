@@ -9,6 +9,8 @@ import batchRouter from './src/routes/batch/batch.route';
 import universityRouter from './src/routes/university/university.route';
 import courseRouter from './src/routes/course/course.route';
 import subjectRouter from './src/routes/subject/subject.route';
+import { analyticsRouter } from './src/routes/analytics/analytics.router';
+import { announcementRouter } from './src/routes/annoucement/annoucement.route';
 
 dotenv.config();
 
@@ -28,6 +30,9 @@ app.use("/api/university", universityRouter);
 app.use("/api/batch", batchRouter);
 app.use("/api/course", courseRouter);
 app.use("/api/subject", subjectRouter);
+app.use("/api/attendance", attendanceRouter);
+app.use("/api/analytics", analyticsRouter);
+app.use("/api/announcement", announcementRouter);
 
 app.use(errorHandler);
 

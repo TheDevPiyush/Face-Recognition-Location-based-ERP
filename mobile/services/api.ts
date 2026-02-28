@@ -1,223 +1,178 @@
 import { API_BASE_URL, STORAGE_KEYS } from '@/constants/Config';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { copyAsync, cacheDirectory } from 'expo-file-system/legacy';
-import { LoginRequest, LoginResponse } from '@/types/auth';
-import { CurrentUser } from '@/types/user';
-import type { AttendanceAnalyticsResponse, SubjectItem } from '@/types/dashboard';
-import type { StudentCalendarResponse } from '@/types/attendance';
+import { cacheDirectory, copyAsync } from 'expo-file-system/legacy';
+import type { CurrentUser } from '@/types/user';
 import type { AttendanceWindow } from '@/types/window';
+import type { SubjectItem } from '@/types/dashboard';
+import type { StudentCalendarResponse } from '@/types/attendance';
 
-export type { LoginRequest, LoginResponse };
+// ─── Auth types ───────────────────────────────────────────────────────────────
+export interface SendCodeResponse { message: string }
+export interface VerifyCodeResponse { token: string; user: CurrentUser }
 
+// ─── Helper ───────────────────────────────────────────────────────────────────
+const parseError = (body: string, fallback = 'Request failed'): string => {
+  try {
+    const d = JSON.parse(body) as { error?: string; message?: string; detail?: string };
+    return (d.error || d.message || d.detail || fallback).trim();
+  } catch {
+    return fallback;
+  }
+};
+
+// ─── Service ──────────────────────────────────────────────────────────────────
 class ApiService {
-    /** PATCH current user profile (including image upload). */
-    async patchCurrentUser(formData: FormData): Promise<CurrentUser> {
-      const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
-      const headers: HeadersInit = {
-        Authorization: `Bearer ${token || ''}`,
-        // Do NOT set Content-Type - fetch will set multipart/form-data with boundary
-      };
-      const response = await fetch(`${this.baseURL}/me/`, {
-        method: 'PATCH',
-        headers,
-        body: formData,
-      });
-      if (!response.ok) {
-        const err = await response.json().catch(() => ({ error: response.statusText }));
-        throw new Error((err as { error?: string }).error || 'Profile update failed');
-      }
-      return response.json();
-    }
   private baseURL: string;
 
   constructor() {
-    this.baseURL = (API_BASE_URL || '').trim();
+    this.baseURL = `${(API_BASE_URL || '').trim()}/api`;
+  }
+
+  // ── Token helpers ────────────────────────────────────────────────────────
+
+  private async getToken(): Promise<string | null> {
+    return AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
   }
 
   private async getAuthHeaders(json = true): Promise<HeadersInit> {
-    const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+    const token = await this.getToken();
     return {
       ...(json && { 'Content-Type': 'application/json' }),
       ...(token && { Authorization: `Bearer ${token}` }),
     } as HeadersInit;
   }
 
-  async login(credentials: LoginRequest): Promise<LoginResponse> {
-    const response = await fetch(`${this.baseURL}/token/login/`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(credentials),
-    });
-
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: 'Invalid credentials' }));
-      throw new Error(error.error || 'Login failed');
-    }
-
-    return response.json();
-  }
-
-  async refreshToken(refreshToken: string): Promise<{ access: string }> {
-    const response = await fetch(`${this.baseURL}/token/refresh/`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ refresh: refreshToken }),
-    });
-
-    if (!response.ok) {
-      throw new Error('Token refresh failed');
-    }
-
-    return response.json();
-  }
+  // ── Core methods ─────────────────────────────────────────────────────────
 
   async get<T>(endpoint: string): Promise<T> {
-    const headers = await this.getAuthHeaders(true);
-    const response = await fetch(`${this.baseURL}${endpoint}`, {
-      method: 'GET',
-      headers,
-    });
-
-    if (!response.ok) {
-      if (response.status === 401) {
-        const refreshToken = await AsyncStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN);
-        if (refreshToken) {
-          try {
-            const { access } = await this.refreshToken(refreshToken);
-            await AsyncStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, access);
-            const newHeaders = await this.getAuthHeaders(true);
-            const retryResponse = await fetch(`${this.baseURL}${endpoint}`, {
-              method: 'GET',
-              headers: newHeaders,
-            });
-            if (!retryResponse.ok) {
-              throw new Error('Request failed after token refresh');
-            }
-            return retryResponse.json();
-          } catch {
-            throw new Error('Session expired. Please login again.');
-          }
-        }
-      }
-      throw new Error(`Request failed: ${response.statusText}`);
-    }
-
-    return response.json();
-  }
-
-  async post<T>(endpoint: string, data: unknown): Promise<T> {
-    const headers = await this.getAuthHeaders(true);
-    const response = await fetch(`${this.baseURL}${endpoint}`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(data),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Request failed: ${response.statusText}`);
-    }
-
-    return response.json();
-  }
-
-  async put<T>(endpoint: string, data: unknown): Promise<T> {
-    const headers = await this.getAuthHeaders(true);
-    const response = await fetch(`${this.baseURL}${endpoint}`, {
-      method: 'PUT',
-      headers,
-      body: JSON.stringify(data),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Request failed: ${response.statusText}`);
-    }
-
-    return response.json();
-  }
-
-  async delete(endpoint: string): Promise<void> {
-    const headers = await this.getAuthHeaders(true);
-    const response = await fetch(`${this.baseURL}${endpoint}`, {
-      method: 'DELETE',
-      headers,
-    });
-
-    if (!response.ok) {
-      throw new Error(`Request failed: ${response.statusText}`);
-    }
-  }
-
-  async getCurrentUser(): Promise<CurrentUser> {
-    return this.get<CurrentUser>('/me/');
-  }
-
-  async getAttendanceAnalytics(params: {
-    month?: string;
-    batch_id?: number;
-    start_date?: string;
-    end_date?: string;
-  }): Promise<AttendanceAnalyticsResponse> {
-    const sp = new URLSearchParams();
-    if (params.month) sp.set('month', params.month);
-    if (params.batch_id != null) sp.set('batch_id', String(params.batch_id));
-    if (params.start_date) sp.set('start_date', params.start_date);
-    if (params.end_date) sp.set('end_date', params.end_date);
-    const qs = sp.toString();
-    const endpoint = qs ? `/attendance/analytics/?${qs}` : '/attendance/analytics/';
-    return this.get<AttendanceAnalyticsResponse>(endpoint);
-  }
-
-  async getSubjects(): Promise<SubjectItem[]> {
-    return this.get<SubjectItem[]>('/subjects/');
-  }
-
-  async getStudentCalendar(params?: { month?: string; batch_id?: number }): Promise<StudentCalendarResponse> {
-    const sp = new URLSearchParams();
-    if (params?.month) sp.set('month', params.month);
-    if (params?.batch_id != null) sp.set('batch_id', String(params.batch_id));
-    const qs = sp.toString();
-    const endpoint = qs ? `/attendance/student-calendar/?${qs}` : '/attendance/student-calendar/';
-    return this.get<StudentCalendarResponse>(endpoint);
-  }
-
-  async getWindow(target_batch: number, target_subject: number): Promise<AttendanceWindow> {
-    const qs = `target_batch=${String(target_batch)}&target_subject=${String(target_subject)}`;
-    const endpoint = `/attendance/window/?${qs}`;
-
-    let headers = await this.getAuthHeaders(true);
-    let res = await fetch(`${this.baseURL}${endpoint}`, { method: 'GET', headers });
-
-    if (res.status === 401) {
-      const refreshToken = await AsyncStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN);
-      if (refreshToken) {
-        const { access } = await this.refreshToken(refreshToken);
-        await AsyncStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, access);
-        headers = await this.getAuthHeaders(true);
-        res = await fetch(`${this.baseURL}${endpoint}`, { method: 'GET', headers });
-      }
-    }
-
+    const headers = await this.getAuthHeaders();
+    const res = await fetch(`${this.baseURL}${endpoint}`, { method: 'GET', headers });
     if (!res.ok) {
-      const body = await res.json().catch(() => ({}));
-      const msg = (body as { error?: string; message?: string }).error ?? (body as { message?: string }).message ?? `Request failed: ${res.statusText}`;
-      throw new Error(typeof msg === 'string' ? msg : 'Window request failed');
+      const body = await res.text();
+      if (res.status === 401) throw new Error('Session expired. Please login again.');
+      throw new Error(parseError(body, `GET ${endpoint} failed`));
     }
-
     return res.json();
   }
 
+  async post<T>(endpoint: string, data: unknown): Promise<T> {
+    const headers = await this.getAuthHeaders();
+    const res = await fetch(`${this.baseURL}${endpoint}`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) {
+      const body = await res.text();
+      if (res.status === 401) throw new Error('Session expired. Please login again.');
+      throw new Error(parseError(body, `POST ${endpoint} failed`));
+    }
+    return res.json();
+  }
+
+  async patch<T>(endpoint: string, data: unknown): Promise<T> {
+    const headers = await this.getAuthHeaders();
+    const res = await fetch(`${this.baseURL}${endpoint}`, {
+      method: 'PATCH',
+      headers,
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) {
+      const body = await res.text();
+      if (res.status === 401) throw new Error('Session expired. Please login again.');
+      throw new Error(parseError(body, `PATCH ${endpoint} failed`));
+    }
+    return res.json();
+  }
+
+  async delete(endpoint: string): Promise<void> {
+    const headers = await this.getAuthHeaders();
+    const res = await fetch(`${this.baseURL}${endpoint}`, { method: 'DELETE', headers });
+    if (!res.ok) {
+      const body = await res.text();
+      throw new Error(parseError(body, `DELETE ${endpoint} failed`));
+    }
+  }
+
+  // ── Auth ─────────────────────────────────────────────────────────────────
+
+  /** Step 1 — POST /api/auth/send-code */
+  async sendCode(email: string): Promise<SendCodeResponse> {
+    return this.post<SendCodeResponse>('/auth/send-code', { email });
+  }
+
+  /** Step 2 — POST /api/auth/verify-code → returns JWT + user */
+  async verifyCode(email: string, code: string): Promise<VerifyCodeResponse> {
+    return this.post<VerifyCodeResponse>('/auth/verify-code', { email, code });
+  }
+
+  // ── Users ─────────────────────────────────────────────────────────────────
+
+  /** GET /api/users/me */
+  async getCurrentUser(): Promise<CurrentUser> {
+    return this.get<CurrentUser>('/users/me');
+  }
+
+  /** PATCH /api/users/me — JSON fields only */
+  async updateCurrentUser(data: Partial<CurrentUser>): Promise<CurrentUser> {
+    return this.patch<CurrentUser>('/users/me', data);
+  }
+
+  /** PATCH /api/users/me — with profile_picture (multipart) */
+  async patchCurrentUser(formData: FormData): Promise<CurrentUser> {
+    const token = await this.getToken();
+    const res = await fetch(`${this.baseURL}/users/me`, {
+      method: 'PATCH',
+      // Do NOT set Content-Type — fetch sets multipart/form-data + boundary automatically
+      headers: { Authorization: `Bearer ${token || ''}` },
+      body: formData,
+    });
+    if (!res.ok) {
+      const body = await res.text();
+      throw new Error(parseError(body, 'Profile update failed'));
+    }
+    return res.json();
+  }
+
+  /** PATCH /api/users/location */
+  async updateLocation(latitude: number, longitude: number): Promise<void> {
+    await this.patch('/users/location', { latitude, longitude });
+  }
+
+  // ── Batches ───────────────────────────────────────────────────────────────
+
+  /** GET /api/batch */
+  async getBatches(): Promise<Array<{ id: string; name: string | null }>> {
+    return this.get('/batch');
+  }
+
+  // ── Subjects ──────────────────────────────────────────────────────────────
+
+  /** GET /api/subject */
+  async getSubjects(): Promise<SubjectItem[]> {
+    return this.get<SubjectItem[]>('/subject');
+  }
+
+  // ── Attendance window ─────────────────────────────────────────────────────
+
+  /** GET /api/attendance/window?target_batch=&target_subject= */
+  async getWindow(target_batch: string, target_subject: string): Promise<AttendanceWindow> {
+    return this.get<AttendanceWindow>(
+      `/attendance/window?target_batch=${target_batch}&target_subject=${target_subject}`
+    );
+  }
+
+  /** POST /api/attendance/window */
   async upsertWindow(params: {
-    target_batch: number;
-    target_subject: number;
+    target_batch: string;
+    target_subject: string;
     is_active: boolean;
     duration?: number;
   }): Promise<AttendanceWindow> {
-    return this.post<AttendanceWindow>('/attendance/window/', params);
+    return this.post<AttendanceWindow>('/attendance/window', params);
   }
+
+  // ── Attendance record ─────────────────────────────────────────────────────
 
   private async ensureFileUri(uri: string): Promise<string> {
     if (uri.startsWith('file://')) return uri;
@@ -232,152 +187,45 @@ class ApiService {
     }
   }
 
-  private buildMarkAttendanceForm(attendance_window: number, imageUri: string): FormData {
+  /** POST /api/attendance/record — multipart: student_picture + attendance_window */
+  async markAttendance(attendance_window: string, imageUri: string): Promise<unknown> {
+    const uploadUri = await this.ensureFileUri(imageUri);
+    const token = await this.getToken();
+    const url = `${this.baseURL}/attendance/record`;
+
     const formData = new FormData();
     (formData as unknown as { append: (k: string, v: unknown) => void }).append('student_picture', {
-      uri: imageUri,
+      uri: uploadUri,
       type: 'image/jpeg',
       name: 'student-picture.jpg',
     });
-    formData.append('attendance_window', String(attendance_window));
-    return formData;
-  }
+    formData.append('attendance_window', attendance_window);
 
-  async markAttendance(attendance_window: number, imageUri: string): Promise<unknown> {
-    const uploadUri = await this.ensureFileUri(imageUri);
-    let token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
-    const url = `${this.baseURL}/attendance/record/`;
+    const result = await new Promise<{ status: number; body: string }>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      let settled = false;
 
-    const parseBackendError = (body: string): string => {
-      try {
-        const data = JSON.parse(body) as { error?: string; message?: string; detail?: string };
-        const msg = (data.error || data.message || data.detail || '').trim();
-        return msg || 'Request failed';
-      } catch {
-        return 'Request failed';
-      }
-    };
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        resolve({ status: xhr.status, body: xhr.responseText || '' });
+      };
 
-    const send = (authToken: string | null): Promise<{ status: number; body: string }> =>
-      new Promise((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        const formData = this.buildMarkAttendanceForm(attendance_window, uploadUri);
-        let settled = false;
+      xhr.onreadystatechange = () => { if (xhr.readyState === 4) finish(); };
+      xhr.onerror = () => { if (!settled) { settled = true; reject(new Error('Network request failed')); } };
+      xhr.ontimeout = () => { if (!settled) { settled = true; reject(new Error('Request timed out')); } };
 
-        const finish = () => {
-          if (settled) return;
-          settled = true;
-          resolve({ status: xhr.status, body: xhr.responseText || '' });
-        };
-
-        xhr.onreadystatechange = () => {
-          if (xhr.readyState === 4) finish();
-        };
-        xhr.onerror = () => {
-          if (settled) return;
-          settled = true;
-          reject(new Error('Network request failed'));
-        };
-        xhr.ontimeout = () => {
-          if (settled) return;
-          settled = true;
-          reject(new Error('Request timed out'));
-        };
-
-        xhr.open('POST', url);
-        xhr.setRequestHeader('Authorization', `Bearer ${authToken || ''}`);
-        xhr.timeout = 600000000;
-        xhr.send(formData);
-      });
-
-    let result = await send(token);
-
-    if (result.status === 401) {
-      const refreshToken = await AsyncStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN);
-      if (refreshToken) {
-        try {
-          const { access } = await this.refreshToken(refreshToken);
-          await AsyncStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, access);
-          result = await send(access);
-        } catch {
-          throw new Error(parseBackendError(result.body) || 'Session expired');
-        }
-      } else {
-        throw new Error(parseBackendError(result.body) || 'Session expired');
-      }
-    }
-
-    if (result.status === 0) {
-      throw new Error('Network request failed');
-    }
-
-    if (result.status < 200 || result.status >= 300) {
-      throw new Error(parseBackendError(result.body));
-    }
-
-    try {
-      return result.body ? JSON.parse(result.body) : {};
-    } catch {
-      return {};
-    }
-  }
-
-  async getBatches(): Promise<Array<{ id: number; name: string | null }>> {
-    return this.get<Array<{ id: number; name: string | null }>>('/batches/');
-  }
-
-  // Announcement API endpoints
-  async getAnnouncements(): Promise<any[]> {
-    const response = await this.get<{ results: any[] } | any[]>('/announcements/');
-    return Array.isArray(response) ? response : response.results || [];
-  }
-
-  async getAnnouncementById(id: number): Promise<any> {
-    return this.get(`/announcements/${id}/`);
-  }
-
-  async searchAnnouncements(query: string): Promise<any[]> {
-    const response = await this.get<{ results: any[] } | any[]>(`/announcements/search/?q=${encodeURIComponent(query)}`);
-    return Array.isArray(response) ? response : response.results || [];
-  }
-
-  async getAnnouncementsByBatch(batchId: number): Promise<any[]> {
-    const response = await this.get<{ results: any[] } | any[]>(`/announcements/batch/${batchId}/`);
-    return Array.isArray(response) ? response : response.results || [];
-  }
-
-  async createAnnouncement(payload: any): Promise<any> {
-    return this.post('/announcements/', payload);
-  }
-
-  async updateAnnouncement(id: number, payload: any): Promise<any> {
-    return this.put(`/announcements/${id}/`, payload);
-  }
-
-  async deleteAnnouncement(id: number): Promise<void> {
-    return this.delete(`/announcements/${id}/`);
-  }
-
-  /** Upload audio or video file for announcements. Returns { url: string }. */
-  async uploadAnnouncementMedia(formData: FormData): Promise<{ url: string }> {
-    const token = await AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
-    const headers: HeadersInit = {
-      Authorization: `Bearer ${token || ''}`,
-      // Do NOT set Content-Type - fetch will set multipart/form-data with boundary
-    };
-
-    const response = await fetch(`${this.baseURL}/announcements/upload-media/`, {
-      method: 'POST',
-      headers,
-      body: formData,
+      xhr.open('POST', url);
+      xhr.setRequestHeader('Authorization', `Bearer ${token || ''}`);
+      xhr.timeout = 60000;
+      xhr.send(formData);
     });
 
-    if (!response.ok) {
-      const err = await response.json().catch(() => ({ error: response.statusText }));
-      throw new Error((err as { error?: string }).error || 'Upload failed');
-    }
+    if (result.status === 0) throw new Error('Network request failed');
+    if (result.status === 401) throw new Error('Session expired. Please login again.');
+    if (result.status < 200 || result.status >= 300) throw new Error(parseError(result.body));
 
-    return response.json();
+    try { return result.body ? JSON.parse(result.body) : {}; } catch { return {}; }
   }
 }
 
